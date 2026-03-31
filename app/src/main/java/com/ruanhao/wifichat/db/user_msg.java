@@ -1,8 +1,8 @@
 package com.ruanhao.wifichat.db;
 
-import org.litepal.crud.DataSupport;
+import org.litepal.crud.LitePalSupport;
 
-public class user_msg extends DataSupport {
+public class user_msg extends LitePalSupport {
 	private int id;//自增id
 	private String username;//用户名
 //	private int msg_id;//消息id

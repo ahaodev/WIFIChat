@@ -92,7 +92,7 @@ dependencies {
     implementation(libs.logger)
     implementation(libs.photoview)
     implementation(libs.matisse)
-    implementation("com.tbruyelle.rxpermissions:rxpermissions:${libs.versions.rxpermissions.get()}@aar")
+    implementation(libs.rxpermissions)
 
     testImplementation(libs.junit)
 

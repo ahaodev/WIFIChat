@@ -210,7 +210,7 @@ public class ChatActivity extends BaseActivity implements ChatInputView.InputCli
 
 				 Matisse.from(ChatActivity.this)
 				.choose(MimeType.ofImage())
-				.theme(R.style.Matisse_Dracula)
+				.theme(com.zhihu.matisse.R.style.Matisse_Dracula)
 				.countable(false)
 				.maxSelectable(9)
 				.imageEngine(new GlideEngine())

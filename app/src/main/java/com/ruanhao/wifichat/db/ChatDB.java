@@ -3,7 +3,7 @@ package com.ruanhao.wifichat.db;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.litepal.crud.DataSupport;
+import org.litepal.LitePal;
 
 
 import android.database.Cursor;
@@ -53,7 +53,7 @@ public class ChatDB {
 		String sql = String.format(
 				"select other_username,other_name,type,content,msg_time from user_msg T3 left join msg T4 on T3.msg_id=T4.id where  T3.id in (select id from (select id,max(msg_time) from (select T1.id id,other_username,msg_time from user_msg T1 left join msg T2 on T1.msg_id=T2.id where username = '%s') group by other_username)) order by msg_time desc",
 				strCurUsername);
-		Cursor cursor = DataSupport.findBySQL(sql);
+		Cursor cursor = LitePal.findBySQL(sql);
 		List<ChatListMessage> list = new ArrayList<ChatListMessage>();
 
 		if (cursor != null && cursor.moveToFirst()) {
@@ -72,7 +72,7 @@ public class ChatDB {
 	 */
 	public List<user_msg> queryChatMessage(String strCurUsername, String strOtherUsername) {
 
-		List<user_msg> list = DataSupport.where("username = ? and other_username = ?", strCurUsername, strOtherUsername).find(user_msg.class, true);
+		List<user_msg> list = LitePal.where("username = ? and other_username = ?", strCurUsername, strOtherUsername).find(user_msg.class, true);
 //		List<ChatMessage> msglist = new ArrayList<ChatMessage>();
 		return list;
 	}
@@ -182,7 +182,7 @@ public class ChatDB {
 		String sql = String.format(
 				"update user_msg set status = 1 where exists (select 1 from msg where username = '%s' and other_username = '%s' and msg_time < %d and status = 0 and user_msg.msg_id = msg.id)",
 				username, other_name, time);
-		Cursor cursor = DataSupport.findBySQL(sql);
+		Cursor cursor = LitePal.findBySQL(sql);
 		int count = 0;
 		if (cursor != null && cursor.moveToFirst()) {
 			count = cursor.getInt(0);
@@ -205,7 +205,7 @@ public class ChatDB {
 	//				count.add(is_read);
 	//			}
 	//		}
-		List<user_msg> read = DataSupport.select("is_read")
+		List<user_msg> read = LitePal.select("is_read")
 				.where("username = ? and other_username =? and dir_type = ? and is_read =? ", myName, youName,String.valueOf(DBConstants.DIR_TYPE_Y),String.valueOf(DBConstants.READ_N)).find(user_msg.class);
 		return read.size();// 未读条数
 	}
@@ -220,7 +220,7 @@ public class ChatDB {
 		if (null == myName || TextUtils.isEmpty(myName)) {
 			return 0;
 		}
-		List<user_msg> readAll = DataSupport.select("is_read").where("username = ? and dir_type = ? and is_read = ?", myName,String.valueOf(DBConstants.DIR_TYPE_Y),String.valueOf(DBConstants.READ_N)).find(user_msg.class);
+		List<user_msg> readAll = LitePal.select("is_read").where("username = ? and dir_type = ? and is_read = ?", myName,String.valueOf(DBConstants.DIR_TYPE_Y),String.valueOf(DBConstants.READ_N)).find(user_msg.class);
 		return readAll.size();
 
 	}

@@ -4,9 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.litepal.annotation.Column;
-import org.litepal.crud.DataSupport;
+import org.litepal.LitePal;
+import org.litepal.crud.LitePalSupport;
 
-public class msg extends DataSupport {
+public class msg extends LitePalSupport {
 	private int id;//自增ID
 	private int type;//消息类型
 	private String content;//消息内容。
@@ -58,7 +59,7 @@ public class msg extends DataSupport {
 		return msg_att;
 	}
 	public msg_attachment queryMsg_att() {
-		return DataSupport.where("msg_id =? ",String.valueOf(getId())).findFirst(msg_attachment.class);
+		return LitePal.where("msg_id =? ",String.valueOf(getId())).findFirst(msg_attachment.class);
 	}
 	public void setMsg_att(msg_attachment msg_att) {
 		this.msg_att = msg_att;

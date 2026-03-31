@@ -1,5 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.ruanhao.wifichat">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -48,7 +47,8 @@
         android:theme="@style/AppTheme">
         <activity
             android:name=".ui.me.LoginActivity"
-            android:label="@string/app_name">
+            android:label="@string/app_name"
+            android:exported="true">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

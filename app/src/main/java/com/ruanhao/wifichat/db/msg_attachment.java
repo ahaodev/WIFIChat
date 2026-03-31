@@ -1,8 +1,8 @@
 package com.ruanhao.wifichat.db;
 
-import org.litepal.crud.DataSupport;
+import org.litepal.crud.LitePalSupport;
 
-public class msg_attachment extends DataSupport {
+public class msg_attachment extends LitePalSupport {
 	private int id;// 系统自增ID
 //	private int msg_id;// 消息id（这里为附件通知消息的id）
 	private String file_uuid;//附件uuid

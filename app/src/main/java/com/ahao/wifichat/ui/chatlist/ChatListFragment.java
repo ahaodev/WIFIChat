@@ -43,16 +43,6 @@ public class ChatListFragment extends BaseFragment {
 	public void onResume() {
 		super.onResume();
 		main = (MainActivity) getActivity();
-		main.getTitleView().setTitle(getTag());
-		main.getTitleView().setRightVisibility(View.VISIBLE);
-		main.getTitleView().setRightText("摄像头");
-		main.getTitleView().setRightClickListener(new OnClickListener() {
-			
-			@Override
-			public void onClick(View v) {
-
-			}
-		});
 	}
 
 	@Override
@@ -61,44 +51,44 @@ public class ChatListFragment extends BaseFragment {
 	}
 
 	private void init(View v) {
-		mListView = (ListView) v.findViewById(R.id.chat_fragment_listview);
-		chatAdapter = new CommonAdapter<ChatListMessage>(getActivity(), users, R.layout.item_chatlist) {
+		mListView = v.findViewById(R.id.chat_fragment_listview);
+		chatAdapter = new CommonAdapter<>(getActivity(), users, R.layout.item_chatlist) {
 
-			@Override
-			public void convert(ViewHolder helper, final ChatListMessage item) {
-				// helper.setImageBitmap(R.id.chperson, null);
-				helper.setText(R.id.tvcontacts, item.getName());
-				helper.setText(R.id.tvcontent, item.getContent());
-				helper.setText(R.id.tvtime, StringUtils.formatTime(item.getTime()));
-				helper.setVisibility(R.id.tvTip, View.GONE);
-				if (null == app.getBinder().getUser(item.getUsername())) {
-					helper.setBackgroundResource(R.id.chperson, R.drawable.wechat);
-				} else {
-					helper.setBackgroundResource(R.id.chperson, R.drawable.wechat_down);
-				}
-				int read = ChatDB.getInstance().findMessageRead(WiFiChat.instance().getMe().getUsername(),
-						item.getUsername());
-				if (read > 0) {
-					helper.setVisibility(R.id.tvTip, View.VISIBLE);
-					helper.setText(R.id.tvTip, read + "");
-				}
-				// helper.setImageResource(R.id.iv_group_type,
-				// R.drawable.sel_chatting_add_btn);
-				helper.setOnclick(R.id.chatlist_click, new OnClickListener() {
+            @Override
+            public void convert(ViewHolder helper, final ChatListMessage item) {
+                // helper.setImageBitmap(R.id.chperson, null);
+                helper.setText(R.id.tvcontacts, item.getName());
+                helper.setText(R.id.tvcontent, item.getContent());
+                helper.setText(R.id.tvtime, StringUtils.formatTime(item.getTime()));
+                helper.setVisibility(R.id.tvTip, View.GONE);
+                if (null == app.getBinder().getUser(item.getUsername())) {
+                    helper.setBackgroundResource(R.id.chperson, R.drawable.wechat);
+                } else {
+                    helper.setBackgroundResource(R.id.chperson, R.drawable.wechat_down);
+                }
+                int read = ChatDB.getInstance().findMessageRead(WiFiChat.instance().getMe().getUsername(),
+                        item.getUsername());
+                if (read > 0) {
+                    helper.setVisibility(R.id.tvTip, View.VISIBLE);
+                    helper.setText(R.id.tvTip, read + "");
+                }
+                // helper.setImageResource(R.id.iv_group_type,
+                // R.drawable.sel_chatting_add_btn);
+                helper.setOnclick(R.id.chatlist_click, new OnClickListener() {
 
-					@Override
-					public void onClick(View v) {
-						OnlineUserInfo user = app.getBinder().getUser(item.getUsername());
-						if (null == user) {// 不在线
-							user = new OnlineUserInfo();
-							user.setUserName(item.getUsername());
-							user.setOnline(0);
-						}
-						startActivity(ChatActivity.class, ChatActivity.USER, user);
-					}
-				});
-			}
-		};
+                    @Override
+                    public void onClick(View v) {
+                        OnlineUserInfo user = app.getBinder().getUser(item.getUsername());
+                        if (null == user) {// 不在线
+                            user = new OnlineUserInfo();
+                            user.setUserName(item.getUsername());
+                            user.setOnline(0);
+                        }
+                        startActivity(ChatActivity.class, ChatActivity.USER, user);
+                    }
+                });
+            }
+        };
 		mListView.setAdapter(chatAdapter);
 		chatAdapter.notifyDataSetChanged(getChatListMessage());
 	}

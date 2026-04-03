@@ -7,11 +7,11 @@
 
     <list>
 
-        <mapping class="com.ruanhao.wifichat.db.msg" />
+        <mapping class="com.ahao.wifichat.db.msg" />
 
-        <mapping class="com.ruanhao.wifichat.db.user_msg" />
+        <mapping class="com.ahao.wifichat.db.user_msg" />
 
-        <mapping class="com.ruanhao.wifichat.db.msg_attachment" />
+        <mapping class="com.ahao.wifichat.db.msg_attachment" />
 
     </list>
 

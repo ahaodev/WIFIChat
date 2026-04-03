@@ -34,7 +34,7 @@
         android:scaleType="fitCenter"
         android:src="@drawable/default_person" />
 
-    <com.ruanhao.wifichat.widget.ChatMessageView
+    <com.ahao.wifichat.widget.ChatMessageView
         android:id="@+id/tvcontent"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

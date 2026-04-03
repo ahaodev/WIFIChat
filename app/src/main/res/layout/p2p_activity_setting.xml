@@ -7,7 +7,7 @@
     android:background="@color/discover"
     android:orientation="vertical"
     tools:ignore="ContentDescription" >
-    <com.ruanhao.wifichat.widget.TitleView
+    <com.ahao.wifichat.widget.TitleView
         android:id="@+id/title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>

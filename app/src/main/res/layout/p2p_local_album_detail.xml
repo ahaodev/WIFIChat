@@ -71,7 +71,7 @@
         android:layout_height="match_parent"
         android:visibility="gone" >
 
-        <com.ruanhao.wifichat.widget.AlbumViewPager
+        <com.ahao.wifichat.widget.AlbumViewPager
             android:id="@+id/albumviewpager"
             android:layout_width="fill_parent"
             android:layout_height="fill_parent"

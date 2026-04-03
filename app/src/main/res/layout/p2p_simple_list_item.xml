@@ -5,7 +5,7 @@
     android:orientation="vertical">
 
 
-    <com.ruanhao.wifichat.widget.FilterImageView
+    <com.ahao.wifichat.widget.FilterImageView
         android:id="@+id/imageView"
         android:layout_width="fill_parent"
         android:layout_height="100dp"

@@ -43,7 +43,7 @@
         android:layout_toRightOf="@+id/chperson"
         android:layout_below="@id/tvtime"/>
 
-    <com.ruanhao.wifichat.widget.ChatMessageView
+    <com.ahao.wifichat.widget.ChatMessageView
         android:id="@+id/tvcontent"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

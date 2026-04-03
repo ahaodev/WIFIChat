@@ -5,7 +5,7 @@
     android:background="@android:color/white"
     android:orientation="vertical" >
 
-    <com.ruanhao.wifichat.widget.TitleView
+    <com.ahao.wifichat.widget.TitleView
         android:id="@+id/title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
@@ -119,11 +119,11 @@
         </LinearLayout>
     </FrameLayout>
 
-    <com.ruanhao.wifichat.widget.ChatInputView
+    <com.ahao.wifichat.widget.ChatInputView
         android:id="@+id/chatInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        class="com.ruanhao.wifichat.ui.chat.ChatInputFragment" />
+        class="com.ahao.wifichat.ui.chat.ChatInputFragment" />
 
     <FrameLayout
         android:id="@+id/chatInputAddition"

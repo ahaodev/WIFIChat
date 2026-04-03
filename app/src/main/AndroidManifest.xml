@@ -76,7 +76,7 @@
         </service>
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="com.ruanhao.wifichat.fileprovider"
+            android:authorities="com.ahao.wifichat.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

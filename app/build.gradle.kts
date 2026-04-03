@@ -16,11 +16,11 @@ val verCode = 1
 val verName = "1.0.0"
 
 android {
-    namespace = "com.ruanhao.wifichat"
+    namespace = "com.ahao.wifichat"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.ruanhao.wifichat"
+        applicationId = "com.ahao.wifichat"
         minSdk = 21
         targetSdk = 35
         versionCode = verCode

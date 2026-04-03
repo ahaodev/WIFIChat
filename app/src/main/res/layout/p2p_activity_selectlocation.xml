@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical" >
 
-    <com.ruanhao.wifichat.widget.TitleView
+    <com.ahao.wifichat.widget.TitleView
         android:id="@+id/map_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
@@ -13,11 +13,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" >
 
-        <com.ruanhao.wifichat.widget.MapView
+        <com.ahao.wifichat.widget.MapView
             android:id="@+id/main_map"
             android:layout_width="match_parent"
             android:layout_height="match_parent" >
-        </com.ruanhao.wifichat.widget.MapView>
+        </com.ahao.wifichat.widget.MapView>
 
         <ImageView
             android:layout_width="wrap_content"

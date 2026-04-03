@@ -38,19 +38,20 @@ public class AudioRecoder {
         release();
 
         mRecorder = new MediaRecorder();
-        mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);// 设置麦克风
-        mRecorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
-        mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-        mRecorder.setMaxDuration(60*1000);
-		mRecorder.setOutputFile(mRecordFile);
-
-		try {
-			mRecorder.prepare();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-        mRecorder.start();
+        try {
+            mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);// 设置麦克风
+            mRecorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
+            mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+            mRecorder.setMaxDuration(60*1000);
+            mRecorder.setOutputFile(mRecordFile);
+            mRecorder.prepare();
+            mRecorder.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+            release();
+            bRun = false;
+            return;
+        }
 		mDuration = 0;
 		startTime = System.currentTimeMillis();
 

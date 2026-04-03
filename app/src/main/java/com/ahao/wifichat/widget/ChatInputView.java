@@ -8,8 +8,10 @@ import com.ahao.wifichat.ui.adapter.ViewHolder;
 import com.ahao.wifichat.ui.chat.ChatActivity;
 import com.ahao.wifichat.utlis.AudioRecoder;
 
-
+import android.Manifest;
+import android.app.Activity;
 import android.app.Service;
+import android.content.pm.PackageManager;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Vibrator;
@@ -27,6 +29,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 /**
  * 聊天底部文字语音输入视图
  * 
@@ -34,6 +39,7 @@ import android.widget.Toast;
  *
  */
 public class ChatInputView extends LinearLayout {
+	private static final int REQUEST_RECORD_AUDIO_PERMISSION = 1001;
 	private ImageButton mBtnAddition;
 	private LinearLayout mInputbody_layout;
 	private Button mBtnSend;
@@ -257,6 +263,16 @@ public class ChatInputView extends LinearLayout {
 		public boolean onTouch(View arg0, MotionEvent arg1) {
 			int action = arg1.getAction() & MotionEvent.ACTION_MASK;
 			if (action == MotionEvent.ACTION_DOWN) {
+				// Check RECORD_AUDIO permission before starting recording
+				if (ContextCompat.checkSelfPermission(mContext, Manifest.permission.RECORD_AUDIO)
+						!= PackageManager.PERMISSION_GRANTED) {
+					if (mContext instanceof Activity) {
+						ActivityCompat.requestPermissions((Activity) mContext,
+								new String[]{Manifest.permission.RECORD_AUDIO},
+								REQUEST_RECORD_AUDIO_PERMISSION);
+					}
+					return false;
+				}
 				downy = arg1.getY();
 
 				mNeedStartRecorder = true;

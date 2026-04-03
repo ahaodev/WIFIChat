@@ -23,6 +23,8 @@
 package com.ahao.wifichat.settings;
 
 
+import com.ahao.wifichat.event.SettingsListener;
+
 /**
  * An "enum" representing the different types of settings that can be changed.
  *

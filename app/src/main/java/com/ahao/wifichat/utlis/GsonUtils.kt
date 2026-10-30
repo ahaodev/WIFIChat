@@ -1,144 +1,47 @@
-package com.ahao.wifichat.utlis;
+package com.ahao.wifichat.utlis
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.TypeAdapter;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
-import com.google.gson.stream.JsonWriter;
-import com.ahao.wifichat.protocol.ParameterizedTypeImpl;
-import com.ahao.wifichat.protocol.v1.MessageInfo;
+import com.ahao.wifichat.protocol.v1.MessageInfo
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import org.json.JSONException
+import org.json.JSONObject
+import java.lang.reflect.Type
 
+/** JSON 解析工具（基于 Gson，类型信息通过 reified 泛型获取） */
+object GsonUtils {
 
-import org.json.JSONException;
-import org.json.JSONObject;
+    @PublishedApi
+    internal val gson = Gson()
 
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
+    /** 解析为 `MessageInfo<T>` */
+    inline fun <reified T> fromJsonObject(json: String): MessageInfo<T>? =
+        gson.fromJson(json, gsonTypeOf<MessageInfo<T>>())
 
-public class GsonUtils {
+    /** 解析为 `MessageInfo<List<T>>` */
+    inline fun <reified T> fromJsonArray(json: String): MessageInfo<List<T>>? =
+        gson.fromJson(json, gsonTypeOf<MessageInfo<List<T>>>())
 
-	/**
-	 * 
-	 * @param json json字符串
-	 * @param clazz 类
-	 * @return
-	 */
-	public static <Fields> MessageInfo<Fields> fromJsonObject(String json, Class<Fields> clazz) {
-		Gson gson = new Gson();
-	    Type type = new ParameterizedTypeImpl(MessageInfo.class, new Class[]{clazz});
-	    return gson.fromJson(json, type);
-	}
-	
-	/**
-	 * 
-	 * @param json json字符串
-	 * @param clazz 类
-	 * @return
-	 */
-	public static <Fields> MessageInfo<List<Fields>> fromJsonArray(String json, Class<Fields> clazz) {
-		Gson gson = new Gson();
-		// 生成List<T> 中的 List<T>
-		Type listType = new ParameterizedTypeImpl(List.class, new Class[] { clazz });
-		// 根据List<T>生成完整的Result<List<T>>
-		Type type = new ParameterizedTypeImpl(MessageInfo.class, new Type[] { listType });
-		return gson.fromJson(json, type);
-	}
-	
-	
-	/**
-	 * 
-	 * @param json
-	 *            整体对象
-	 * @param listjson
-	 *            要提取的Array
-	 * @param type
-	 *            将转换成的类型
-	 * @return 返回arraylist实体
-	 * @throws JSONException
-	 *             异常交给error回调
-	 */
-	public static <T> ArrayList<T> getJsonarrays(String json, String listjson, Type type) throws JSONException {
-		Gson gson = new Gson();
-		JSONObject obj = new JSONObject(json);
-		String arr = obj.getJSONArray(listjson).toString();
-		ArrayList<T> list = gson.fromJson(arr, type);
-		return list;
-	}
+    /** 直接解析为实体 */
+    inline fun <reified T> getJson(json: String): T? = gson.fromJson(json.trim(), gsonTypeOf<T>())
 
-	/**
-	 * 
-	 * @param json
-	 *            String 串
-	 * @param type
-	 *            类型
-	 * @return
-	 * @throws JSONException
-	 */
-	public static <T> ArrayList<T> getJsonarrays(String json, Type type) throws JSONException {
-		Gson gson = new Gson();
-		ArrayList<T> list = gson.fromJson(json, type);
-		return list;
-	}
+    /** 取出 JSON 对象中名为 [key] 的字段并解析为实体 */
+    inline fun <reified T> getJson(json: String, key: String): T? =
+        try {
+            gson.fromJson<T>(JSONObject(json).getString(key).trim(), gsonTypeOf<T>())
+        } catch (e: JSONException) {
+            e.printStackTrace()
+            null
+        }
 
-	/**
-	 * 直接转换成单个实体类
-	 * 
-	 * @param json
-	 * @param t
-	 * @return
-	 * @throws JSONException
-	 */
-	public static <T> T getJson(String json, Class<T> t)   {
-		Gson gson = new Gson();
-		T bean = gson.fromJson(json.trim(), t);
-		return bean;
-	}
-	public static <T> T getJson(String json,String str,Class<T>t) {
-		JSONObject obj = null;
-		Gson gson = new Gson();
-		T bean = null;
-		try {
-			obj = new JSONObject(json);
-			bean = gson.fromJson(obj.getString(str).trim(), t);
-		} catch (JSONException e) {
-			e.printStackTrace();
-		}
-		return bean;
-	}
-	public <T> T getjsonNoNull(String json, Class<T> t) {
-		Gson gson = new GsonBuilder().registerTypeAdapter(t, STRING).serializeNulls().create();
-		return gson.fromJson(json, t);
-	}
+    /** 取出 JSON 对象中名为 [listKey] 的数组并解析为列表 */
+    fun <T> getJsonArrays(json: String, listKey: String, type: Type): List<T>? {
+        val arr = JSONObject(json).getJSONArray(listKey).toString()
+        return gson.fromJson(arr, type)
+    }
 
-	/**
-	 * 自定义TypeAdapter ,null对象将被解析成空字符串
-	 */
-	public static final TypeAdapter<String> STRING = new TypeAdapter<String>() {
-		public String read(JsonReader reader) {
-			try {
-				if (reader.peek() == JsonToken.NULL) {
-					reader.nextNull();
-					return "";// 原先是返回Null，这里改为返回空字符串
-				}
-				return reader.nextString();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-			return "";
-		}
-
-		public void write(JsonWriter writer, String value) {
-			try {
-				if (value == null) {
-					writer.nullValue();
-					return;
-				}
-				writer.value(value);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-	};
+    @PublishedApi
+    internal inline fun <reified T> gsonTypeOf(): Type = object : TypeToken<T>() {}.type
 }
+
+/** 序列化为 JSON 字符串（复用同一个 Gson 实例） */
+fun Any.toJson(): String = GsonUtils.gson.toJson(this)

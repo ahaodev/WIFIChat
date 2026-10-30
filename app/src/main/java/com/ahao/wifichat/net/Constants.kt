@@ -1,64 +1,49 @@
-package com.ahao.wifichat.net;
-/**
- * 后期可以跟protocol类整合
- * @author hao.ruan
- *
- */
-public interface Constants {
-	String APP_NAME = "WIFI-Chat";
-	
-	/**
-	 * 广播IP
-	 */
-	String NETWORK_BROADCAST_IP = "255.255.255.255";
-	/**
-	 * UDP接收端口
-	 */
-	int NETWORK_UDP_PORT = 12425;
-	
-	/**
-	 * 用于发送的临时多播地址和接收数据包
-	 */
-	String NETWORK_TEMP_IP = "224.168.5.250";
-	/**
-	 * 用于发送和接受的临时组播udp端口
-	 */
+package com.ahao.wifichat.net
 
-	int NETWORK_TEMP_PORT = 50056;
-	/**
-	 * 数据包大小
-	 */
-	int NETWORK_PACKET_SIZE = 1024;
-	/**
-	 * 消息编码
-	 */
-	String MESSAGE_CHARSET = "UTF-8";
+import java.io.File
 
-	/**
-	 * 用于发送和接收的普通udp端口 用于私人聊天的数据包。 这只是起始端口。 如果它已经在使用，端口+1被尝试，等等。
-	 */
-	int NETWORK_PRIVCHAT_PORT = 40656;
-	String APP_VERSION = "0.0.1";
-	/**
-	 * 用于发送和接收的组播地址 数据包为群聊天。
-	 */
-	String NETWORK_IP = "224.168.5.200";
+/** 网络相关常量（后期可与 protocol 包整合） */
+object Constants {
+    const val APP_NAME = "WIFI-Chat"
 
-	/**
-	 * The multicast udp port used for sending and receiving packets for the
-	 * main chat.
-	 */
-	int NETWORK_CHAT_PORT = 40555;
-	/**
-	 * The folder where the application can save files.
-	 */
-	String APP_FOLDER = System.getProperty("user.home") + System.getProperty("file.separator") + "."
-			+ APP_NAME.toLowerCase() + System.getProperty("file.separator");
-	/**
-	 * The folder where log files are stored.
-	 */
-	String APP_LOG_FOLDER = APP_FOLDER + "logs" + System.getProperty("file.separator");
+    /** 广播 IP */
+    const val NETWORK_BROADCAST_IP = "255.255.255.255"
 
-	int TCP_SERVER_RECEIVE_PORT=5557;
-	int READ_BUFFER_SIZE = 1024*4;// 文件流缓冲大小
+    /** UDP 接收端口 */
+    const val NETWORK_UDP_PORT = 12425
+
+    /** 用于发送的临时多播地址和接收数据包 */
+    const val NETWORK_TEMP_IP = "224.168.5.250"
+
+    /** 用于发送和接收的临时组播 UDP 端口 */
+    const val NETWORK_TEMP_PORT = 50056
+
+    /** 数据包大小 */
+    const val NETWORK_PACKET_SIZE = 1024
+
+    /** 消息编码 */
+    const val MESSAGE_CHARSET = "UTF-8"
+
+    /** 私聊 UDP 端口的起始值，若被占用则依次 +1 尝试 */
+    const val NETWORK_PRIVCHAT_PORT = 40656
+
+    const val APP_VERSION = "0.0.1"
+
+    /** 群聊组播地址 */
+    const val NETWORK_IP = "224.168.5.200"
+
+    /** 群聊组播端口 */
+    const val NETWORK_CHAT_PORT = 40555
+
+    /** 应用文件目录 */
+    val APP_FOLDER: String =
+        System.getProperty("user.home") + File.separator + ".${APP_NAME.lowercase()}" + File.separator
+
+    /** 日志目录 */
+    val APP_LOG_FOLDER: String = APP_FOLDER + "logs" + File.separator
+
+    const val TCP_SERVER_RECEIVE_PORT = 5557
+
+    /** 文件流缓冲大小 */
+    const val READ_BUFFER_SIZE = 1024 * 4
 }

@@ -4,6 +4,8 @@ import java.util.Date
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.parcelize)
+    alias(libs.plugins.ksp)
     jacoco
 }
 
@@ -17,12 +19,12 @@ val verName = "1.0.0"
 
 android {
     namespace = "com.ahao.wifichat"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.ahao.wifichat"
-        minSdk = 21
-        targetSdk = 35
+        minSdk = 23
+        targetSdk = 37
         versionCode = verCode
         versionName = verName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -86,17 +88,24 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.appcompat)
     implementation(libs.gson)
-    implementation(libs.litepal)
-    implementation(libs.rxandroid)
-    implementation(libs.rxjava)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.camera.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.video)
+    implementation(libs.camera.view)
     implementation(libs.logger)
     implementation(libs.photoview)
     implementation(libs.matisse)
-    implementation(libs.rxpermissions)
 
     testImplementation(libs.junit)
 
     androidTestImplementation(libs.test.runner)
+    androidTestImplementation(libs.test.ext.junit)
     androidTestImplementation(libs.test.rules)
     androidTestImplementation(libs.espresso.core)
 }

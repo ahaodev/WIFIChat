@@ -1,11 +1,10 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" 
     android:layout_width="fill_parent" android:layout_height="fill_parent">  
       
-    <SurfaceView android:id="@+id/surface_camera"  
-                    android:layout_width="fill_parent"
-        android:layout_height="wrap_content" 
-        android:layout_gravity="center"
-      		/>  
+    <androidx.camera.view.PreviewView
+        android:id="@+id/surface_camera"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />  
     <ImageView android:id="@+id/img_view"
 		android:layout_width="match_parent"
         android:layout_height="match_parent" 

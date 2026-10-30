@@ -1,197 +1,96 @@
+package com.ahao.wifichat.net.socket
 
-/***************************************************************************
- *   Copyright 2006-2016 by Christian Ihle                                 *
- *   contact@kouchat.net                                                   *
- *                                                                         *
- *   This file is part of KouChat.                                         *
- *                                                                         *
- *   KouChat is free software; you can redistribute it and/or modify       *
- *   it under the terms of the GNU Lesser General Public License as        *
- *   published by the Free Software Foundation, either version 3 of        *
- *   the License, or (at your option) any later version.                   *
- *                                                                         *
- *   KouChat is distributed in the hope that it will be useful,            *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU      *
- *   Lesser General Public License for more details.                       *
- *                                                                         *
- *   You should have received a copy of the GNU Lesser General Public      *
- *   License along with KouChat.                                           *
- *   If not, see <http://www.gnu.org/licenses/>.                           *
- ***************************************************************************/
+import com.ahao.wifichat.entity.Userinfo
+import com.ahao.wifichat.misc.ErrorHandler
+import com.ahao.wifichat.net.Constants
+import com.ahao.wifichat.net.ReceiverListener
+import java.io.IOException
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.util.logging.Level
+import java.util.logging.Logger
 
-package com.ahao.wifichat.net.socket;
+/** UDP 单播接收：在后台线程循环读取数据包并回调 [listener] */
+class UDPReceiver(
+    private val userinfo: Userinfo,
+    private val errorHandler: ErrorHandler,
+) : Runnable {
 
-import com.ahao.wifichat.entity.Userinfo;
-import com.ahao.wifichat.misc.ErrorHandler;
-import com.ahao.wifichat.net.Constants;
-import com.ahao.wifichat.net.ReceiverListener;
-import com.ahao.wifichat.utlis.Validate;
+    private var udpSocket: DatagramSocket? = null
+    private var listener: ReceiverListener? = null
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+    @Volatile
+    private var connected = false
 
-
-
-
-/**
- * Receives UDP packets sent directly to the IP address
- * of this machine.
- *
- * @author Christian Ihle
- */
-public class UDPReceiver implements Runnable {
-
-    /** The logger. */
-    private static final Logger LOG = Logger.getLogger(UDPReceiver.class.getName());
-
-    /** The datagram socket used for receiving messages. */
-    private DatagramSocket udpSocket;
-
-    /** The listener getting all the messages received here. */
-    private ReceiverListener listener;
-
-    /** If connected to the network or not. */
-    private boolean connected;
-
-    /** The error handler for registering important messages. */
-    private final ErrorHandler errorHandler;
-
-    /** The application user. */
-//    private final User me;
-    
-    private final Userinfo userinfo;
-
-    /**
-     * Default constructor.
-     *
-     * @param errorHandler The error handler to use.
-     */
-    public UDPReceiver(final Userinfo userinfo, final ErrorHandler errorHandler) {
-        Validate.notNull(userinfo, "userinfo can not be null");
-        Validate.notNull(errorHandler, "Error handler can not be null");
-
-        this.errorHandler = errorHandler;
-//        me = settings.getMe();
-        this.userinfo = userinfo;
-    }
-
-    /**
-     * The run() method of this thread. Checks for new packets,
-     * extracts the message and IP address, and notifies the listener.
-     */
-    public void run() {
+    override fun run() {
+        val socket = udpSocket ?: return
         while (connected) {
             try {
-                final DatagramPacket packet = new DatagramPacket(
-                        new byte[Constants.NETWORK_PACKET_SIZE], Constants.NETWORK_PACKET_SIZE);
-
-                udpSocket.receive(packet);
-                final String ip = packet.getAddress().getHostAddress();
-				final int port =packet.getPort();
-                final String message = new String(packet.getData(), Constants.MESSAGE_CHARSET).trim();
-                LOG.log(Level.FINE, "Message arrived from " + ip + ": " + message);
-
-                if (listener != null) {
-                    listener.messageArrived(message, ip, port);
-                }
-            }
-
-            // Happens when socket is closed, or network is down
-            catch (final IOException e) {
-                if (connected) {
-                    LOG.log(Level.WARNING, e.toString());
-                }
-
-                else {
-                    LOG.log(Level.FINE, e.toString());
-                }
+                val packet = DatagramPacket(ByteArray(Constants.NETWORK_PACKET_SIZE), Constants.NETWORK_PACKET_SIZE)
+                socket.receive(packet)
+                val ip = packet.address.hostAddress.orEmpty()
+                val port = packet.port
+                val message = String(packet.data, 0, packet.length, charset(Constants.MESSAGE_CHARSET)).trim()
+                LOG.fine { "Message arrived from $ip: $message" }
+                listener?.messageArrived(message, ip, port)
+            } catch (e: IOException) {
+                // 套接字关闭或网络断开时会走到这里
+                LOG.log(if (connected) Level.WARNING else Level.FINE, e.toString())
             }
         }
     }
 
-    /**
-     * Creates a new UDP socket, and starts a thread listening
-     * on the UDP port. If the UDP port is in use, a new port will be
-     * tried instead.
-     */
-    public void startReceiver() {
-        LOG.log(Level.FINE, "Connecting...");
-
+    @Synchronized
+    fun startReceiver() {
+        LOG.fine("Connecting...")
         if (connected) {
-            LOG.log(Level.FINE, "Already connected.");
+            LOG.fine("Already connected.")
+            return
         }
 
-        else {
-            int port = Constants.NETWORK_UDP_PORT;
-            int counter = 0;
-
-            while (counter < 50 && !connected) {
-                try {
-                    udpSocket = new DatagramSocket(port);
-                    connected = true;
-
-                    // The background thread watching for messages from the network.
-                    final Thread worker = new Thread(this, "UDPReceiverWorker");
-                    worker.start();
-
-                    userinfo.setPort(port);
-                    
-                    LOG.log(Level.FINE, "Connected to port " + port);
-                }
-
-                catch (final IOException e) {
-                    LOG.log(Level.SEVERE, e.toString() + " " + port);
-
-                    counter++;
-                    port++;
-                    userinfo.setPort(0);
-                }
-            }
-
-            if (!connected) {
-                final String error = "Failed to initialize udp network:" +
-                        "\nNo available listening port between " + Constants.NETWORK_PRIVCHAT_PORT +
-                        " and " + (port - 1) + "." +
-                        "\n\nYou will not be able to receive private messages!";
-
-                LOG.log(Level.SEVERE, error);
-                errorHandler.showError(error);
+        var port = Constants.NETWORK_UDP_PORT
+        var counter = 0
+        while (counter < 50 && !connected) {
+            try {
+                udpSocket = DatagramSocket(port)
+                connected = true
+                Thread(this, "UDPReceiverWorker").start()
+                userinfo.port = port
+                LOG.fine("Connected to port $port")
+            } catch (e: IOException) {
+                LOG.log(Level.SEVERE, "$e $port")
+                counter++
+                port++
+                userinfo.port = 0
             }
         }
-    }
-
-    /**
-     * Closes the UDP socket, and stops the thread.
-     */
-    public void stopReceiver() {
-        LOG.log(Level.FINE, "Disconnecting...");
 
         if (!connected) {
-            LOG.log(Level.FINE, "Not connected.");
-        }
-
-        else {
-            connected = false;
-
-            if (udpSocket != null && !udpSocket.isClosed()) {
-                udpSocket.close();
-            }
-
-            LOG.log(Level.FINE, "Disconnected.");
+            val error = "Failed to initialize udp network:" +
+                "\nNo available listening port between ${Constants.NETWORK_PRIVCHAT_PORT} and ${port - 1}." +
+                "\n\nYou will not be able to receive private messages!"
+            LOG.log(Level.SEVERE, error)
+            errorHandler.showError(error)
         }
     }
 
-    /**
-     * Sets the listener who will receive all the messages
-     * from the UDP packets.
-     *
-     * @param listener The object to register as a listener.
-     */
-    public void registerReceiverListener(final ReceiverListener listener) {
-        this.listener = listener;
+    @Synchronized
+    fun stopReceiver() {
+        LOG.fine("Disconnecting...")
+        if (!connected) {
+            LOG.fine("Not connected.")
+            return
+        }
+        connected = false
+        udpSocket?.takeIf { !it.isClosed }?.close()
+        LOG.fine("Disconnected.")
+    }
+
+    fun registerReceiverListener(listener: ReceiverListener) {
+        this.listener = listener
+    }
+
+    private companion object {
+        val LOG: Logger = Logger.getLogger(UDPReceiver::class.java.name)
     }
 }

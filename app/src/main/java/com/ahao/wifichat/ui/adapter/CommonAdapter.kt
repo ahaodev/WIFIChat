@@ -1,67 +1,37 @@
-package com.ahao.wifichat.ui.adapter;
+package com.ahao.wifichat.ui.adapter
 
-import java.util.List;
+import android.content.Context
+import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
 
-import android.content.Context;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
+/** 通用列表适配器：子类实现 [convert] 填充每一项 */
+abstract class CommonAdapter<T>(
+    protected val context: Context,
+    protected var datas: List<T>?,
+    private val itemLayoutId: Int,
+) : BaseAdapter() {
 
-/**
- * 通用适配器
- * 
- * @author hao.ruan
- *
- * @param <T>
- */
-public abstract class CommonAdapter<T> extends BaseAdapter {
-	protected LayoutInflater mInflater;
-	protected Context mContext;
-	protected List<T> mDatas;
-	protected final int mItemLayoutId;
+    override fun getCount(): Int = datas?.size ?: 0
 
-	public CommonAdapter(Context context, List<T> mDatas, int itemLayoutId) {
-		this.mContext = context;
-		this.mInflater = LayoutInflater.from(mContext);
-		this.mDatas = mDatas;
-		this.mItemLayoutId = itemLayoutId;
-	}
+    override fun getItem(position: Int): T? = datas?.get(position)
 
-	@Override
-	public int getCount() {
-		return mDatas == null ? 0 : mDatas.size();
-	}
+    override fun getItemId(position: Int): Long = position.toLong()
 
-	@Override
-	public T getItem(int position) {
-		return mDatas == null ? null : mDatas.get(position);
-	}
+    override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+        val holder = getViewHolder(position, convertView, parent)
+        convert(holder, getItem(position))
+        return holder.convertView
+    }
 
-	@Override
-	public long getItemId(int position) {
-		return position;
-	}
+    abstract fun convert(helper: ViewHolder, item: T?)
 
-	@Override
-	public View getView(final int position, View convertView, ViewGroup parent) {
-		final ViewHolder viewHolder = getViewHolder(position, convertView, parent);
-		convert(viewHolder, getItem(position));
-		return viewHolder.getConvertView();
+    protected open fun getViewHolder(position: Int, convertView: View?, parent: ViewGroup?): ViewHolder =
+        ViewHolder.get(context, convertView, parent, itemLayoutId, position)
 
-	}
-
-	public abstract void convert(ViewHolder helper, T item);
-
-	protected ViewHolder getViewHolder(int position, View convertView, ViewGroup parent) {
-		return ViewHolder.get(mContext, convertView, parent, mItemLayoutId, position);
-	}
-
-	public void notifyDataSetChanged(List<T> mDatas) {
-		if (null==mDatas) {
-			return;
-		}
-		this.mDatas = mDatas;
-		notifyDataSetChanged();
-	}
+    fun notifyDataSetChanged(newDatas: List<T>?) {
+        if (newDatas == null) return
+        datas = newDatas
+        notifyDataSetChanged()
+    }
 }

@@ -1,107 +1,87 @@
-package com.ahao.wifichat;
+package com.ahao.wifichat
 
-import android.app.Application;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.ContextWrapper;
-import android.content.Intent;
-import android.content.ServiceConnection;
-import android.os.Handler;
-import android.os.IBinder;
+import android.app.Application
+import android.content.ComponentName
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import com.ahao.wifichat.entity.Userinfo
+import com.ahao.wifichat.net.Constants
+import com.ahao.wifichat.net.file.TcpService
+import com.ahao.wifichat.service.P2PService
+import com.ahao.wifichat.utlis.NetworkUtils
+import java.io.File
+import kotlin.system.exitProcess
 
+/** 应用级上下文：管理后台服务连接、文件接收服务与当前用户 */
+class WiFiChat(base: Context) : ContextWrapper(base) {
 
-import com.ahao.wifichat.entity.Userinfo;
-import com.ahao.wifichat.net.Constants;
+    /** 与 [P2PService] 的绑定对象，连接建立后才可用 */
+    var binder: P2PService.P2PServiceBindle? = null
+        private set
 
-import com.ahao.wifichat.net.file.TcpService;
-import com.ahao.wifichat.service.P2PService;
-import com.ahao.wifichat.utlis.NetworkUtils;
+    val activityManager = ActivityManager()
 
-import java.io.File;
+    /** 当前登录用户 */
+    val me = Userinfo(ipAdderss = NetworkUtils.getLocalIpAddress(), port = Constants.NETWORK_UDP_PORT)
 
-public class WiFiChat extends ContextWrapper {
-	private static WiFiChat _instance = null;
-	P2PService.P2PServiceBindle mBinder=null;
-	ActivityManager activityManager = new ActivityManager();
-	private Userinfo me = new Userinfo();
-	public static WiFiChat instance() {
-		return _instance;
-	}
+    private val intentService = Intent(this, P2PService::class.java)
 
-	public WiFiChat(Context base) {
-		super(base);
-		me.setIpAdderss(NetworkUtils.getLocalIpAddress());
-		me.setPort(Constants.NETWORK_UDP_PORT);
-		startService();
-		initNotifcation();
-	}
+    private var tcpService: TcpService? = null
 
-	private void initNotifcation() {
-	
-	}
+    private val conn = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            binder = service as P2PService.P2PServiceBindle
+            initTCPService()
+        }
 
-	public static void init(Application app) {
-		synchronized (WiFiChat.class) {
-			_instance = new WiFiChat(app);
-		}
-	}
+        override fun onServiceDisconnected(name: ComponentName?) {
+            // 服务意外断开时暂不处理
+        }
+    }
 
-	public ActivityManager getActivityManager() {
-		return activityManager;
-	}
-	Intent intentService = new Intent(this, P2PService.class);
-	public void startService() {
-		startService(intentService);
-		bindService(intentService, conn, Context.BIND_AUTO_CREATE);
-	}
-	public void stopService(){
-		stopService(intentService);
-		unbindService(conn);
-	}
-	public void exit() {
-		unbindService(conn);
-		System.exit(0);
-	}
+    init {
+        startService()
+    }
 
-	private ServiceConnection conn = new ServiceConnection() {
+    fun startService() {
+        startService(intentService)
+        bindService(intentService, conn, BIND_AUTO_CREATE)
+    }
 
-		@Override
-		public void onServiceConnected(ComponentName name, IBinder service) {
-			mBinder = (P2PService.P2PServiceBindle) service;
-			initTCPService();
-//			mBinder.getChatManager().sendEntry();
-		}
+    fun stopService() {
+        stopService(intentService)
+        unbindService(conn)
+    }
 
-		@Override
-		public void onServiceDisconnected(ComponentName name) {
-//			mBinder.getChatManager().sendOutLine();
-		}
+    fun exit() {
+        unbindService(conn)
+        exitProcess(0)
+    }
 
-	};
-	 TcpService tcpService;
-	/**
-	 * 文件接受线程
-	 */
-	public void initTCPService() {
-		String foloder = WifiChatApplication.getInstance().getAppPath();
-		File savedir = new File(foloder);
-		if (!savedir.exists()) {
-			savedir.mkdirs();
-		}
-		tcpService = TcpService.getInstance(this);
-		TcpService.setHandler(new Handler());
-		tcpService.setSavePath(savedir.getAbsolutePath());
-		tcpService.startReceive();
-	}
-	public P2PService.P2PServiceBindle getBinder() {
-		return mBinder;
-	}
+    /** 启动文件接收线程，保存到应用目录 */
+    fun initTCPService() {
+        val savedir = File(WifiChatApplication.instance.appPath)
+        if (!savedir.exists()) savedir.mkdirs()
+        tcpService = TcpService.getInstance(this).also {
+            TcpService.setHandler(Handler(Looper.getMainLooper()))
+            it.setSavePath(savedir.absolutePath)
+            it.startReceive()
+        }
+    }
 
-	Userinfo location_user = new Userinfo();
-	NetworkUtils network = new NetworkUtils();
-	// 获取自己的信息
-	public Userinfo getMe() {
-		return me;
-	}
+    companion object {
+        lateinit var instance: WiFiChat
+            private set
 
+        fun init(app: Application) {
+            synchronized(WiFiChat::class.java) {
+                instance = WiFiChat(app)
+            }
+        }
+    }
 }

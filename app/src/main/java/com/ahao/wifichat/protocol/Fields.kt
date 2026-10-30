@@ -1,5 +1,4 @@
-package com.ahao.wifichat.protocol;
+package com.ahao.wifichat.protocol
 
-public class Fields {
-
-}
+/** 协议字段基类（v1 消息体的父类） */
+open class Fields

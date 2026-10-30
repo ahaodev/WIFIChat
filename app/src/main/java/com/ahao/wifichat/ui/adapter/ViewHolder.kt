@@ -1,342 +1,75 @@
-package com.ahao.wifichat.ui.adapter;
+package com.ahao.wifichat.ui.adapter
 
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.Paint;
-import android.graphics.drawable.Drawable;
-import android.text.Spanned;
-import android.util.DisplayMetrics;
-import android.util.SparseArray;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.View.OnClickListener;
-import android.view.ViewGroup;
-import android.view.ViewGroup.LayoutParams;
-import android.view.WindowManager;
-import android.widget.CheckBox;
-import android.widget.CompoundButton.OnCheckedChangeListener;
-import android.widget.GridView;
-import android.widget.ImageView;
-import android.widget.TextView;
+import android.content.Context
+import android.graphics.Bitmap
+import android.util.SparseArray
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
+import com.ahao.wifichat.utlis.GlideLoder
 
-import com.ahao.wifichat.utlis.GlideLoder;
-import com.ahao.wifichat.utlis.ImageLoader;
+/** 列表项视图缓存，支持链式调用 */
+class ViewHolder private constructor(
+    private val context: Context,
+    parent: ViewGroup?,
+    layoutId: Int,
+    var position: Int,
+) {
+    private val views = SparseArray<View>()
+    private val imageLoader = GlideLoder<Any>(context)
 
+    val convertView: View = LayoutInflater.from(context).inflate(layoutId, parent, false).also { it.tag = this }
 
-public class ViewHolder {
-	private final SparseArray<View> mViews;
-	private int mPosition;
-	private View mConvertView;
-	private Context context;
-	private ImageLoader imageLoader;
-	private ViewHolder(Context context, ViewGroup parent, int layoutId,
-			int position) {
-		this.mPosition = position;
-		this.mViews = new SparseArray<View>();
-		this.context = context;
-		mConvertView = LayoutInflater.from(context).inflate(layoutId, parent,
-				false);
-		// setTag
+    @Suppress("UNCHECKED_CAST")
+    fun <T : View> getView(viewId: Int): T {
+        val view = views.get(viewId) ?: convertView.findViewById<View>(viewId).also { views.put(viewId, it) }
+        return view as T
+    }
 
-		mConvertView.setTag(this);
-		imageLoader=new GlideLoder(context);
-	}
+    fun setText(viewId: Int, text: CharSequence?): ViewHolder = apply { getView<TextView>(viewId).text = text }
 
-	/**
-	 * 拿到一个ViewHolder对象
-	 * 
-	 * @param context
-	 * @param convertView
-	 * @param parent
-	 * @param layoutId
-	 * @param position
-	 * @return
-	 */
-	public static ViewHolder get(Context context, View convertView,
-			ViewGroup parent, int layoutId, int position) {
-		ViewHolder holder = null;
-		if (null==convertView) {
-			holder = new ViewHolder(context, parent, layoutId, position);
-		} else {
-			holder = (ViewHolder) convertView.getTag();
-			holder.mPosition = position;
-		}
-		return holder;
-	}
+    fun setText(viewId: Int, resStrId: Int): ViewHolder = apply { getView<TextView>(viewId).setText(resStrId) }
 
-	public View getConvertView() {
-		return mConvertView;
-	}
+    fun setTextColor(viewId: Int, color: Int): ViewHolder = apply { getView<TextView>(viewId).setTextColor(color) }
 
-	/**
-	 * 通过控件的Id获取对于的控件，如果没有则加入views
-	 * 
-	 * @param viewId
-	 * @return
-	 */
-	public <T extends View> T getView(int viewId) {
-		View view = mViews.get(viewId);
-		if (view == null) {
-			view = mConvertView.findViewById(viewId);
-			mViews.put(viewId, view);
-		}
-		return (T) view;
-	}
+    fun setTag(viewId: Int, tag: Any?): ViewHolder = apply { getView<View>(viewId).tag = tag }
 
-	public int getPosition() {
-		return mPosition;
-	}
+    fun setImageResource(viewId: Int, drawableId: Int): ViewHolder = apply {
+        getView<ImageView>(viewId).setImageResource(drawableId)
+    }
 
-	public View getConverView() {
-		return mConvertView;
-	}
+    fun setImageBitmap(viewId: Int, bm: Bitmap): ViewHolder = apply { getView<ImageView>(viewId).setImageBitmap(bm) }
 
-	/**
-	 * 为TextView设置字符串
-	 * 
-	 * @param viewId
-	 * @param text
-	 * @return
-	 */
-	public ViewHolder setText(int viewId, String text) {
-		TextView view = getView(viewId);
-		view.setText(text);
-		return this;
-	}
-	/**
-	 * 为TextView设置字符串
-	 * 
-	 * @param viewId
-	 * @return
-	 */
-	public ViewHolder setText(int viewId, int resStrID) {
-		TextView view = getView(viewId);
-		view.setText(resStrID);
-		return this;
-	}
-	/**
-	 * 为TextView设置字符串
-	 * 
-	 * @param viewId
-	 * @return
-	 */
-	public ViewHolder setText(int viewId, CharSequence text) {
-		TextView view = getView(viewId);
-		view.setText(text);
-		return this;
-	}
-	public  ViewHolder setCompoundDrawables(int viewId,Drawable left, Drawable top, Drawable right, Drawable bottom){
-		TextView view = getView(viewId);
-		view.setCompoundDrawables(left, top, right, bottom);  
-		return this;
-	}
+    fun setImageByUrl(viewId: Int, url: String): ViewHolder = apply {
+        imageLoader.loadImage(getView(viewId), url)
+    }
 
-	
-	/**
-	 * 为ImageView设置图片
-	 * 
-	 * @param viewId
-	 * @param drawableId
-	 * @return
-	 */
-	public ViewHolder setImageResource(int viewId, int drawableId) {
-		ImageView view = getView(viewId);
-		view.setImageResource(drawableId);
+    fun setBackgroundResource(viewId: Int, drawable: Int): ViewHolder = apply {
+        getView<View>(viewId).setBackgroundResource(drawable)
+    }
 
-		return this;
-	}
+    fun setOnClick(viewId: Int, listener: View.OnClickListener): ViewHolder = apply {
+        getView<View>(viewId).setOnClickListener(listener)
+    }
 
-	/**
-	 * 为ImageView设置图片
-	 * 
-	 * @param viewId
-	 * @return
-	 */
-	public ViewHolder setImageBitmap(int viewId, Bitmap bm) {
-		ImageView view = getView(viewId);
-		view.setImageBitmap(bm);
-		return this;
-	}
+    fun setVisibility(viewId: Int, visibility: Int): ViewHolder = apply { getView<View>(viewId).visibility = visibility }
 
-	/**
-	 * 为ImageView设置图片
-	 * 
-	 * @param viewId
-	 * @return
-	 */
-	public ViewHolder setImageByUrl(int viewId, String url) {
-		ImageView view = getView(viewId);
-		imageLoader.loadImage(view,url);
-		return this;
-	}
+    fun getVisibility(viewId: Int): Int = getView<View>(viewId).visibility
 
-	/**
-	 * 为ImageView设置图片
-	 * 
-	 * @param viewId
-	 * @return
-	 */
-	public ViewHolder setImageBySDcred(int viewId, String path) {
-		ImageView view = getView(viewId);
-		imageLoader.loadImage(view,path);
-		return this;
-	}
+    fun goNone(viewId: Int): ViewHolder = setVisibility(viewId, View.GONE)
 
-	public String getText(int viewId) {
-		TextView view = getView(viewId);
-		return view.getText().toString();
-	}
+    fun goShow(viewId: Int): ViewHolder = setVisibility(viewId, View.VISIBLE)
 
-	public ViewHolder setApha(int viewId, int apha) {
-		View v = getView(viewId);
-		v.getBackground().setAlpha(apha);// 0~255閫忔槑搴﹀��
-		return this;
-	}
+    fun getText(viewId: Int): String = getView<TextView>(viewId).text.toString()
 
-	public ViewHolder setTag(int viewId, String text) {
-		TextView view = getView(viewId);
-		view.setTag(text);
-		return this;
-	}
-
-	public ViewHolder setTextDrawable(int viewId, int imgL, int imgT, int imgR,
-			int imgB) {
-		TextView view = getView(viewId);
-		Drawable drawableL = null, drawableT = null, drawableR = null, drawableB = null;
-		if (imgL != 0) {
-			drawableL = context.getResources().getDrawable(imgL);
-			drawableL.setBounds(0, 0, drawableL.getMinimumWidth(),
-					drawableL.getMinimumHeight());
-		}
-		if (imgT != 0) {
-			drawableT = context.getResources().getDrawable(imgT);
-			drawableT.setBounds(0, 0, drawableT.getMinimumWidth(),
-					drawableT.getMinimumHeight());
-		}
-		if (imgR != 0) {
-			drawableR = context.getResources().getDrawable(imgR);
-			drawableR.setBounds(0, 0, drawableR.getMinimumWidth(),
-					drawableR.getMinimumHeight());
-		}
-		if (imgB != 0) {
-			drawableB = context.getResources().getDrawable(imgB);
-			drawableB.setBounds(0, 0, drawableB.getMinimumWidth(),
-					drawableB.getMinimumHeight());
-		}
-		view.setCompoundDrawables(drawableL, drawableT, drawableR, drawableB);
-		return this;
-	}
-
-	public ViewHolder setTextfromHtml(int viewId, Spanned text) {
-		TextView view = getView(viewId);
-		view.setText(text);
-		return this;
-	}
-
-	public void setImageDrawable(int activitysStatus, Drawable drawable) {
-		ImageView view = getView(activitysStatus);
-		view.setImageDrawable(drawable);
-
-	}
-
-	public ViewHolder setBackgroundResource(int viewId, int drawable) {
-		View view = getView(viewId);
-		view.setBackgroundResource(drawable);
-		return this;
-	}
-
-	public ViewHolder setBackgroundColor(int viewId, int color) {
-		View view = getView(viewId);
-		view.setBackgroundColor(color);
-		return this;
-	}
-
-	public ViewHolder goNone(int viewId) {
-		View rl = getView(viewId);
-		rl.setVisibility(View.GONE);
-		return this;
-	}
-
-	public ViewHolder goShow(int viewId) {
-		View rl = getView(viewId);
-		rl.setVisibility(View.VISIBLE);
-		return this;
-	}
-
-	public ViewHolder setView(int viewId, LayoutParams params) {
-		View fview = getView(viewId);
-		fview.setLayoutParams(params);
-		return this;
-
-	}
-
-	public ViewHolder setFlags(int viewId) {
-		TextView view = getView(viewId);
-		view.getPaint().setFlags(Paint.STRIKE_THRU_TEXT_FLAG);
-		return this;
-	}
-
-	public ViewHolder SetWidth(int viewId, int width) {
-		View view = getView(viewId);
-		WindowManager wManager = (WindowManager) context
-				.getSystemService(Context.WINDOW_SERVICE);
-		DisplayMetrics outMetrics = new DisplayMetrics();
-		wManager.getDefaultDisplay().getMetrics(outMetrics);
-		int mMaxItemWith = (int) (outMetrics.widthPixels * 0.7f);
-		int mMinItemWith = (int) (outMetrics.widthPixels * 0.15f);
-		LayoutParams lParams = view.getLayoutParams();
-		lParams.width = (int) (mMinItemWith + mMaxItemWith / 60f * width);
-		view.setLayoutParams(lParams);
-		return this;
-	}
-
-	public ViewHolder setHightWidth(int viewId, int width, int higth) {
-		View view = getView(viewId);
-		view.setLayoutParams(new LayoutParams(width, higth));
-		return this;
-	}
-
-	public ViewHolder setOnclick(int viewId, OnClickListener listener) {
-		View view = getView(viewId);
-		view.setOnClickListener(listener);
-		return this;
-	}
-
-	public ViewHolder setOnCheckedChangeListener(int viewId,
-			OnCheckedChangeListener listener) {
-		CheckBox view = getView(viewId);
-		view.setOnCheckedChangeListener(listener);
-		return this;
-	}
-
-	public ViewHolder setTextColor(int viewId, int pink) {
-		TextView view = getView(viewId);
-		view.setTextColor(pink);
-		return this;
-	}
-
-	public ViewHolder setVisibility(int viewId, int visiable) {
-		View view = getView(viewId);
-		view.setVisibility(visiable);
-		return this;
-	}
-
-	public int getVisibility(int viewId) {
-		View view = getView(viewId);
-		return view.getVisibility();
-	}
-
-	public ViewHolder setTextGravity(int viewId, int gravity) {
-		TextView view = getView(viewId);
-		view.setGravity(gravity);
-		return this;
-	}
-
-	public <T> ViewHolder setGVColumns(int item_id, int numColumns) {
-		GridView gv = getView(item_id);
-		gv.setNumColumns(numColumns);
-		return this;
-
-	}
-
+    companion object {
+        fun get(context: Context, convertView: View?, parent: ViewGroup?, layoutId: Int, position: Int): ViewHolder =
+            if (convertView == null) {
+                ViewHolder(context, parent, layoutId, position)
+            } else {
+                (convertView.tag as ViewHolder).apply { this.position = position }
+            }
+    }
 }

@@ -1,5 +1,5 @@
-package com.ahao.wifichat.protocol;
+package com.ahao.wifichat.protocol
 
-public class P2pVersion {
-	public static final byte ONE = 1;
+object P2pVersion {
+    const val ONE = 1
 }

@@ -1,10 +1,6 @@
-package com.ahao.wifichat.utlis;
+package com.ahao.wifichat.utlis
 
-/**
- * Created by hao.ruan on 2017/11/3.
- */
-
-public enum IMAGE {
+enum class IMAGE {
     URL,
     URI,
     FILE,

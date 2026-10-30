@@ -1,91 +1,24 @@
+package com.ahao.wifichat.misc
 
-/***************************************************************************
- *   Copyright 2006-2016 by Christian Ihle                                 *
- *   contact@kouchat.net                                                   *
- *                                                                         *
- *   This file is part of KouChat.                                         *
- *                                                                         *
- *   KouChat is free software; you can redistribute it and/or modify       *
- *   it under the terms of the GNU Lesser General Public License as        *
- *   published by the Free Software Foundation, either version 3 of        *
- *   the License, or (at your option) any later version.                   *
- *                                                                         *
- *   KouChat is distributed in the hope that it will be useful,            *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU      *
- *   Lesser General Public License for more details.                       *
- *                                                                         *
- *   You should have received a copy of the GNU Lesser General Public      *
- *   License along with KouChat.                                           *
- *   If not, see <http://www.gnu.org/licenses/>.                           *
- ***************************************************************************/
+import com.ahao.wifichat.event.ErrorListener
 
-package com.ahao.wifichat.misc;
+/** 向监听器分发错误信息（最终展示给用户） */
+class ErrorHandler {
+    private val listeners = mutableListOf<ErrorListener>()
 
-
-import com.ahao.wifichat.event.ErrorListener;
-import com.ahao.wifichat.utlis.Validate;
-
-import java.util.ArrayList;
-import java.util.List;
-
-/**
- * This is a class for reporting errors to listeners.
- *
- * <p>These errors will be shown to the user of the application.</p>
- *
- * @author Christian Ihle
- */
-public class ErrorHandler {
-
-    /** The error listeners. */
-    private final List<ErrorListener> listeners;
-
-    public ErrorHandler() {
-        listeners = new ArrayList<ErrorListener>();
+    fun showError(errorMsg: String) {
+        listeners.forEach { it.errorReported(errorMsg) }
     }
 
-    /**
-     * This method notifies the listeners that an error has occurred.
-     *
-     * @param errorMsg The message to deliver to the listeners.
-     */
-    public void showError(final String errorMsg) {
-        for (final ErrorListener listener : listeners) {
-            listener.errorReported(errorMsg);
-        }
+    fun showCriticalError(criticalErrorMsg: String) {
+        listeners.forEach { it.criticalErrorReported(criticalErrorMsg) }
     }
 
-    /**
-     * This method notifies the listeners that a critical error has occurred.
-     *
-     * @param criticalErrorMsg The message to deliver to the listeners.
-     */
-    public void showCriticalError(final String criticalErrorMsg) {
-        for (final ErrorListener listener : listeners) {
-            listener.criticalErrorReported(criticalErrorMsg);
-        }
+    fun addErrorListener(listener: ErrorListener) {
+        listeners += listener
     }
 
-    /**
-     * Adds a new error listener.
-     *
-     * @param listener The class to add as a listener.
-     */
-    public void addErrorListener(final ErrorListener listener) {
-        Validate.notNull(listener, "Error listener can not be null");
-
-        listeners.add(listener);
-    }
-
-    /**
-     * Removes an error listener.
-     *
-     * @param listener The class to remove as a listener.
-     */
-    public void removeErrorListener(final ErrorListener listener) {
-        Validate.notNull(listener, "Error listener can not be null");
-
-        listeners.remove(listener);
+    fun removeErrorListener(listener: ErrorListener) {
+        listeners -= listener
     }
 }

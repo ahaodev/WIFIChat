@@ -1,121 +1,70 @@
-package com.ahao.wifichat.widget;
+package com.ahao.wifichat.widget
 
-import com.ahao.wifichat.R;
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.util.AttributeSet
+import android.view.View
+import com.ahao.wifichat.R
 
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Paint.Style;
-import android.graphics.RectF;
-import android.util.AttributeSet;
-import android.view.View;
+/** 圆环形音量/进度指示器 */
+class VolumnView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyle: Int = 0,
+) : View(context, attrs, defStyle) {
 
-/**
- * 仿小米声音调节环形进度条
- */
-public class VolumnView extends View {
+    private val outerWidth = 15f
+    private val innerWidth = 30f
 
-	// 半径
-	float r1 = 0;
-	float r2 = 0;
-	float r3 = 0;
-	// 外圆宽度
-	float w1 = 15;
-	// 内圆宽度
-	float w2 = 30;
-	Paint paint;
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val bitmap: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.ling)
+    private val oval by lazy { RectF() }
 
-	// 进度
-	float progress = 0;
+    /** 进度，0 ~ 100 */
+    var progress: Float = 0f
+        set(value) {
+            field = value.coerceIn(0f, 100f)
+            postInvalidate()
+        }
 
-	Bitmap bitmap;
-	
-	RectF oval;
+    override fun onDraw(canvas: Canvas) {
+        val cx = measuredWidth / 2f
+        val cy = measuredHeight / 2f
+        val r1 = cx - outerWidth / 2
+        val r2 = cx - outerWidth / 2 - innerWidth / 2
+        val r3 = cx - outerWidth / 2 - innerWidth
 
-	public VolumnView(Context context, AttributeSet attrs, int defStyle) {
-		super(context, attrs, defStyle);
-		init(context);
-	}
+        paint.strokeWidth = outerWidth
+        paint.color = Color.parseColor("#454547")
+        canvas.drawCircle(cx, cy, r1, paint)
 
-	public VolumnView(Context context, AttributeSet attrs) {
-		super(context, attrs);
-		init(context);
-	}
+        paint.color = Color.parseColor("#747476")
+        paint.strokeWidth = innerWidth
+        canvas.drawCircle(cx, cy, r2, paint)
 
-	public VolumnView(Context context) {
-		super(context);
-		init(context);
-	}
+        paint.color = Color.parseColor("#464648")
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(cx, cy, r3, paint)
 
-	void init(Context context) {
-		paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-		paint.setStyle(Style.STROKE);
-		bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ling);
-	}
+        canvas.drawBitmap(bitmap, cx - bitmap.width / 2, cx - bitmap.height / 2, paint)
 
-	@Override
-	protected void onDraw(Canvas canvas) {
-		float cx = getMeasuredWidth() / 2;
-		float cy = getMeasuredHeight() / 2;
-		r1 = cx - w1 / 2;
-		r2 = cx - w1 / 2 - w2 / 2;
-		r3 = cx - w1 / 2 - w2;
+        paint.color = Color.WHITE
+        paint.strokeWidth = 0f
+        paint.textSize = 40f
+        val text = "铃声"
+        val textWidth = paint.measureText(text)
+        canvas.drawText(text, cx - textWidth / 2, cx + bitmap.height / 2 + 40, paint)
 
-		// 绘制外圆
-		paint.setStrokeWidth(w1);
-		paint.setColor(Color.parseColor("#454547"));
-		canvas.drawCircle(cx, cy, r1, paint);
-
-		// 绘制中间圆环
-		paint.setColor(Color.parseColor("#747476"));
-		paint.setStrokeWidth(w2);
-		canvas.drawCircle(cx, cy, r2, paint);
-
-		// 绘制内圆
-		paint.setColor(Color.parseColor("#464648"));
-		paint.setStyle(Style.FILL);
-		canvas.drawCircle(cx, cy, r3, paint);
-
-		// 绘制中间的图片
-		canvas.drawBitmap(bitmap, cx - bitmap.getWidth() / 2,
-				cx - bitmap.getHeight() / 2, paint);
-
-		// 绘制文本
-		paint.setColor(Color.WHITE);
-		paint.setStrokeWidth(0);
-		paint.setTextSize(40);
-		float textWidth = paint.measureText("铃声"); // 测量字体宽度，我们需要根据字体的宽度设置在圆环中间
-
-		canvas.drawText("铃声", cx - textWidth / 2, cx + bitmap.getHeight() / 2
-				+ 40, paint);
-
-		// 绘制进度
-		paint.setStyle(Style.STROKE);
-		paint.setStrokeWidth(w2);
-		paint.setColor(Color.WHITE);
-		if (oval == null) {
-			oval = new RectF(cx - r2, cy - r2, cx + r2, cy + r2); // 用于定义的圆弧的形状和大小的界限
-		}
-		canvas.drawArc(oval, 270, 360 * progress / 100, false, paint);
-
-		super.onDraw(canvas);
-	}
-
-	/**
-	 * 设置进度
-	 * 
-	 * @param progress
-	 *            范围(0-100)
-	 */
-	public void setProgress(float progress) {
-		this.progress = progress;
-		if (this.progress >= 100)
-			this.progress = 100;
-		if (this.progress <= 0)
-			this.progress = 0;
-		postInvalidate();
-	}
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = innerWidth
+        paint.color = Color.WHITE
+        oval.set(cx - r2, cy - r2, cx + r2, cy + r2)
+        canvas.drawArc(oval, 270f, 360 * progress / 100, false, paint)
+        super.onDraw(canvas)
+    }
 }

@@ -1,78 +1,54 @@
-package com.ahao.wifichat.ui.chat;
+package com.ahao.wifichat.ui.chat
 
+import android.view.View
+import android.widget.TextView
+import com.ahao.wifichat.R
+import com.ahao.wifichat.widget.ChatInputView
+import kotlin.math.log10
 
+/** 录音过程中的界面反馈（音量、倒计时、取消提示） */
+class ChatAudioListener(private val chat: ChatActivity) : ChatInputView.AudioRecordCallback {
 
-import android.view.View;
-import android.widget.TextView;
+    private val volumeLevels = intArrayOf(
+        R.drawable.voice_record_1, R.drawable.voice_record_2, R.drawable.voice_record_3,
+        R.drawable.voice_record_4, R.drawable.voice_record_5, R.drawable.voice_record_6,
+        R.drawable.voice_record_7, R.drawable.voice_record_8,
+    )
 
-import com.ahao.wifichat.R;
-import com.ahao.wifichat.widget.ChatInputView;
+    override fun onRecording(iTime: Int, amplitude: Int) {
+        // 振幅转分贝，再分为 8 个音量级别
+        val ratio = amplitude / 600
+        var db = if (ratio > 1) (20 * log10(ratio.toDouble())).toInt() else 0
+        db = (db / 4).coerceAtMost(7)
+        chat.findViewById<TextView>(R.id.voice_volume).setBackgroundResource(volumeLevels[db])
+        if (iTime >= 50) {
+            chat.findViewById<TextView>(R.id.tv_voice_time_count_down).text = "时间过短"
+        }
+    }
 
-public class ChatAudioListener implements ChatInputView.AudioRecordCallback {
-	ChatActivity chat;
+    override fun onStartRecord() {
+        chat.findViewById<TextView>(R.id.voice_volume).setBackgroundResource(R.drawable.voice_record_3)
+        chat.findViewById<View>(R.id.recordimage).visibility = View.VISIBLE
+        chat.findViewById<TextView>(R.id.tv_voice_time_count_down).setText(R.string.cancel_sendvoice)
+        onReturnNormal()
+    }
 
-	public ChatAudioListener(ChatActivity chat) {
-		this.chat = chat;
-	}
+    override fun onStopRecord() {
+        chat.findViewById<View>(R.id.recordimage).visibility = View.INVISIBLE
+        chat.findViewById<View>(R.id.recordimage_cancel).visibility = View.INVISIBLE
+    }
 
-	@Override
-	public void onRecording(int iTime, int amplitude) {
+    override fun onReadyCancel() {
+        chat.findViewById<View>(R.id.recordimage_cancel).visibility = View.VISIBLE
+        chat.findViewById<View>(R.id.recordimage).visibility = View.INVISIBLE
+    }
 
-		final int vols[] = { R.drawable.voice_record_1, R.drawable.voice_record_2, R.drawable.voice_record_3,
-				R.drawable.voice_record_4, R.drawable.voice_record_5, R.drawable.voice_record_6,
-				R.drawable.voice_record_7, R.drawable.voice_record_8 };
-		// 将音频转成分贝
-		int ratio = amplitude / 600;
-		int db = 0;// 分贝
-		if (ratio > 1)
-			db = (int) (20 * Math.log10(ratio));
-		// 分级
-		db = db / 4;
-		if (db > 7)
-			db = 7;
+    override fun onReturnNormal() {
+        chat.findViewById<View>(R.id.recordimage).visibility = View.VISIBLE
+        chat.findViewById<View>(R.id.recordimage_cancel).visibility = View.INVISIBLE
+    }
 
-		((TextView) chat.findViewById(R.id.voice_volume)).setBackgroundResource(vols[db]);
-
-		if (iTime >= 50) {
-			String format = "时间过短";
-			String str = String.format(format, 60 - iTime);
-			((TextView) chat.findViewById(R.id.tv_voice_time_count_down)).setText(str);
-		}
-
-	}
-
-	@Override
-	public void onStartRecord() {
-		((TextView) chat.findViewById(R.id.voice_volume)).setBackgroundResource(R.drawable.voice_record_3);
-		chat.findViewById(R.id.recordimage).setVisibility(View.VISIBLE);
-
-		((TextView) chat.findViewById(R.id.tv_voice_time_count_down)).setText(R.string.cancel_sendvoice);
-		onReturnNormal();
-	}
-
-	@Override
-	public void onStopRecord() {
-		chat.findViewById(R.id.recordimage).setVisibility(View.INVISIBLE);
-		chat.findViewById(R.id.recordimage_cancel).setVisibility(View.INVISIBLE);
-	}
-
-	@Override
-	public void onReadyCancel() {
-		chat.findViewById(R.id.recordimage_cancel).setVisibility(View.VISIBLE);
-
-		chat.findViewById(R.id.recordimage).setVisibility(View.INVISIBLE);
-	}
-
-	@Override
-	public void onReturnNormal() {
-		chat.findViewById(R.id.recordimage).setVisibility(View.VISIBLE);
-
-		chat.findViewById(R.id.recordimage_cancel).setVisibility(View.INVISIBLE);
-	}
-
-	@Override
-	public void recodEnd(String path) {
-		chat.sendAudio(path);
-	}
-
+    override fun recodEnd(path: String?) {
+        chat.sendAudio(path)
+    }
 }

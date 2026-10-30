@@ -1,75 +1,51 @@
-package com.ahao.wifichat;
+package com.ahao.wifichat
 
-import java.io.File;
-import java.util.HashMap;
+import android.app.Application
+import android.content.Context
+import android.os.Environment
+import android.view.Display
+import android.view.WindowManager
+import com.ahao.wifichat.net.file.FileState
+import com.ahao.wifichat.db.ChatDB
+import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
-import org.litepal.LitePal;
+class WifiChatApplication : Application() {
 
-import android.app.Application;
-import android.content.Context;
-import android.os.Environment;
-import android.view.Display;
-import android.view.WindowManager;
+    private var display: Display? = null
 
-import com.ahao.wifichat.net.file.FileState;
+    override fun onCreate() {
+        WiFiChat.init(this)
+        ChatDB.init(this)
+        super.onCreate()
+        instance = this
+        display = (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+    }
 
-public class WifiChatApplication extends Application {
-	static WifiChatApplication app;
-	private Display display;
-	public static HashMap<String, FileState> sendFileStates;
-	public static HashMap<String, FileState> recieveFileStates;
+    override fun onTerminate() {
+        super.onTerminate()
+        WiFiChat.instance.stopService() // 停止后台服务
+    }
 
-	@Override
-	public void onCreate() {
-		WiFiChat.init(this);
-		LitePal.initialize(this);
-		super.onCreate();
-		app = this;
-		WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
-		display = windowManager.getDefaultDisplay();
-		sendFileStates = new HashMap<>();
-		recieveFileStates = new HashMap<>();
-	}
+    /** 应用文件目录：优先外部存储，其次内部数据目录 */
+    val appPath: String
+        get() {
+            val roots = listOf(Environment.getExternalStorageDirectory(), Environment.getDataDirectory())
+            val root = roots.firstOrNull { it.exists() } ?: return ""
+            return File(root, "Wifi-Chat").apply { if (!exists()) mkdirs() }.absolutePath
+        }
 
-	@Override
-	public void onTerminate() {
-		super.onTerminate();
-		WiFiChat.instance().stopService();//停止后台服务
-	}
+    /** 屏幕宽度的四分之一 */
+    val quarterWidth: Int get() = (display?.width ?: 0) / 4
 
-	public static WifiChatApplication getInstance() {
-		return app;
-	}
+    companion object {
+        lateinit var instance: WifiChatApplication
+            private set
 
-	public String getAppPath() {
-		File appPath = null;
-		appPath = new File(Environment.getExternalStorageDirectory().getAbsolutePath());// 外置
-		if (appPath.exists()) {
-			File appFiles = new File(appPath, "Wifi-Chat");
-			if (!appFiles.exists()) {
-				appFiles.mkdirs();
-			}
-			return appFiles.getAbsolutePath();
-		}
-		appPath = new File(Environment.getDataDirectory().getAbsolutePath());// 内置
-		if (appPath.exists()) {
-			File appFiles = new File(appPath, "Wifi-Chat");
-			if (!appFiles.exists()) {
-				appFiles.mkdirs();
-			}
-			return appFiles.getAbsolutePath();
-		}
-		return "";
-	}
+        /** 正在发送的文件状态，key 为本地路径 */
+        val sendFileStates = HashMap<String, FileState>()
 
-	public int getQuarterWidth() {
-		return display.getWidth() / 4;
-	}
-
-	AppConfig config = AppConfig.getInstance();
-
-	public AppConfig appConfig() {
-		return config;
-	}
-	
+        /** 正在接收的文件状态，key 为本地保存路径 */
+        val recieveFileStates = ConcurrentHashMap<String, FileState>()
+    }
 }

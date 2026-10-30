@@ -1,93 +1,59 @@
-package com.ahao.wifichat.utlis;
+package com.ahao.wifichat.utlis
 
-import android.annotation.SuppressLint;
-import android.media.MediaPlayer;
-import android.media.MediaPlayer.OnCompletionListener;
+import android.annotation.SuppressLint
+import android.media.MediaPlayer
 
+/** 语音播放器，播放结束时通过 [OnPlayListener] 回调文件路径 */
 @SuppressLint("SimpleDateFormat")
-public class AudioPlayer implements OnCompletionListener {
+class AudioPlayer(private val playListener: OnPlayListener? = null) : MediaPlayer.OnCompletionListener {
 
-	public interface onPlayListener {
-		void onStop(String path);
-	}
+    fun interface OnPlayListener {
+        fun onStop(path: String?)
+    }
 
-	private String mRecordFile;
-	private boolean bRun;
+    private var player: MediaPlayer? = null
 
-	private MediaPlayer mPlayer;
-	private onPlayListener mPlayListener;
+    var recordPath: String? = null
+        private set
 
-	public AudioPlayer(onPlayListener playListener) {
-		mPlayListener = playListener;
-	}
+    var isRun: Boolean = false
+        private set
 
-	public void startPlay(String path) {
-		bRun = true;
+    fun startPlay(path: String) {
+        isRun = true
+        release()
+        recordPath = path
+        val mp = MediaPlayer().also { player = it }
+        runCatching {
+            mp.reset()
+            mp.setDataSource(path)
+            mp.prepare()
+            mp.start()
+            mp.setOnCompletionListener(this)
+        }.onFailure { release() }
+    }
 
+    /** 回退 1 秒 */
+    fun changePlay() {
+        val mp = player?.takeIf { isRun } ?: return
+        runCatching { mp.seekTo(mp.currentPosition - 1000) }.onFailure { it.printStackTrace() }
+    }
 
-		release();
+    fun stopPlay() {
+        if (player == null || !isRun) return
+        release()
+        isRun = false
+        recordPath = null
+    }
 
-		mRecordFile = path;
-		mPlayer = new MediaPlayer();
-		try {
-			mPlayer.reset();
-			mPlayer.setDataSource(path);
-			mPlayer.prepare();
-			mPlayer.start();
-			mPlayer.setOnCompletionListener(this);
-		} catch (Exception e) {
-			release();
-		}
-	}
+    override fun onCompletion(mp: MediaPlayer) {
+        isRun = false
+        val path = recordPath
+        recordPath = null
+        playListener?.onStop(path)
+    }
 
-	public void changePlay() {
-		if (mPlayer == null || !isRun())
-			return;
-
-
-		try {
-			mPlayer.seekTo(mPlayer.getCurrentPosition() - 1000);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	public void stopPlay() {
-		if (mPlayer == null || !isRun())
-			return;
-
-
-		release();
-		bRun = false;
-		mRecordFile = null;
-	}
-
-	public String getRecordPath() {
-		return mRecordFile;
-	}
-
-	public boolean isRun() {
-		return bRun;
-	}
-
-	@Override
-	public void onCompletion(MediaPlayer mp) {
-		bRun = false;
-		String path = mRecordFile;
-		mRecordFile = null;
-
-
-		if (mPlayListener != null)
-			mPlayListener.onStop(path);
-	}
-
-	private void release() {
-		if (mPlayer != null) {
-			try {
-				mPlayer.release();
-				mPlayer = null;
-			} catch (Exception e) {
-			}
-		}
-	}
+    private fun release() {
+        player?.let { mp -> runCatching { mp.release() }.onSuccess { player = null } }
+    }
 }

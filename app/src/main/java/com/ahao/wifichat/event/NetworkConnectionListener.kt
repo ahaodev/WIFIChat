@@ -1,53 +1,13 @@
+package com.ahao.wifichat.event
 
-/***************************************************************************
- *   Copyright 2006-2016 by Christian Ihle                                 *
- *   contact@kouchat.net                                                   *
- *                                                                         *
- *   This file is part of KouChat.                                         *
- *                                                                         *
- *   KouChat is free software; you can redistribute it and/or modify       *
- *   it under the terms of the GNU Lesser General Public License as        *
- *   published by the Free Software Foundation, either version 3 of        *
- *   the License, or (at your option) any later version.                   *
- *                                                                         *
- *   KouChat is distributed in the hope that it will be useful,            *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU      *
- *   Lesser General Public License for more details.                       *
- *                                                                         *
- *   You should have received a copy of the GNU Lesser General Public      *
- *   License along with KouChat.                                           *
- *   If not, see <http://www.gnu.org/licenses/>.                           *
- ***************************************************************************/
+/** 网络连接状态变化回调 */
+interface NetworkConnectionListener {
+    /** 网络断开；[silent] 为 true 时不向用户提示 */
+    fun networkWentDown(silent: Boolean)
 
-package com.ahao.wifichat.event;
+    /** 网络即将可用，所有监听器都会先收到此回调，再收到 [networkCameUp] */
+    fun beforeNetworkCameUp()
 
-/**
- * Implement this interface and register as a listener with
- * {@link net.usikkert.kouchat.net.NetworkService#registerNetworkConnectionListener(NetworkConnectionListener)}
- * to get notified of changes in the network connection.
- *
- * @author Christian Ihle
- */
-public interface NetworkConnectionListener {
-
-    /**
-     * The connection to the network was lost.
-     *
-     * @param silent Don't give any messages to the user about the change.
-     */
-    void networkWentDown(boolean silent);
-
-    /**
-     * The network came up, and any preparations necessary to make it ready for use needs to happen here.
-     * All listeners get this notification before anyone gets notified with {@link #networkCameUp(boolean)}.
-     */
-    void beforeNetworkCameUp();
-
-    /**
-     * The connection to the network came up and is ready for use.
-     *
-     * @param silent Don't give any messages to the user about the change.
-     */
-    void networkCameUp(boolean silent);
+    /** 网络已就绪；[silent] 为 true 时不向用户提示 */
+    fun networkCameUp(silent: Boolean)
 }

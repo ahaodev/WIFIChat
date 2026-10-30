@@ -1,159 +1,83 @@
-package com.ahao.wifichat.service;
+package com.ahao.wifichat.service
 
+import android.app.Service
+import android.content.Intent
+import android.os.Binder
+import android.os.IBinder
+import com.ahao.wifichat.net.DataConnection
+import com.ahao.wifichat.net.UsersListener
+import com.ahao.wifichat.service.parcelable.OnlineUserInfo
+import com.ahao.wifichat.service.parcelable.UserLocation
+import java.util.concurrent.ConcurrentHashMap
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+class P2PService : Service() {
 
+    /** 在线人员位置，key 为用户名 */
+    val onlineUsersLocation = ConcurrentHashMap<String, UserLocation>()
 
-import android.app.Service;
-import android.content.Intent;
-import android.os.Binder;
-import android.os.IBinder;
+    /** 在线列表，key 为用户名 */
+    val onlineUsers = ConcurrentHashMap<String, OnlineUserInfo>()
 
-import com.ahao.wifichat.WiFiChat;
-import com.ahao.wifichat.db.user_msg;
-import com.ahao.wifichat.entity.Userinfo;
-import com.ahao.wifichat.net.DataConnection;
-import com.ahao.wifichat.net.UsersListener;
-import com.ahao.wifichat.service.parcelable.OnlineUserInfo;
-import com.ahao.wifichat.service.parcelable.UserLocation;
+    /** 用户上下线回调 */
+    var userListener: UsersListener? = null
 
-/**
- * WiFi聊天Service 持有发送和接受
- * 
- * @author hao.ruan
- *
- */
-public class P2PService extends Service {
-	// 在线人员位置
-	public Map<String, UserLocation> mOnlineUsersLocation = new ConcurrentHashMap<String, UserLocation>();
-	// 在线列表
-	public Map<String, OnlineUserInfo> mOnlineUsers = new ConcurrentHashMap<String, OnlineUserInfo>();
-	UsersListener userListener;// 用户上下线回调
-	private Map<String, user_msg> conversations = new HashMap<>();// 会话列表
+    private lateinit var dataConnection: DataConnection
+    private lateinit var chatManager: ChatManager
 
-	//会话管理
-	private ChatManager mChatManager = null;
-	//数据连接管理
-	private DataConnection mDataConnection = null;
+    private val binder = P2PServiceBindle()
 
-	Userinfo me;
-	@Override
-	public IBinder onBind(Intent intent) {
-		return mBinder;
-	}
+    /** 供 Activity 绑定后访问服务内部状态 */
+    inner class P2PServiceBindle : Binder() {
+        val users: List<OnlineUserInfo> get() = onlineUsers.values.toList()
 
-	private final P2PServiceBindle mBinder = new P2PServiceBindle();
+        val usersLocation: List<UserLocation> get() = onlineUsersLocation.values.toList()
 
-	public class P2PServiceBindle extends Binder {
-		public List<OnlineUserInfo> getUsers() {
-			List<OnlineUserInfo> us = new ArrayList<OnlineUserInfo>();
-			for (OnlineUserInfo user : mOnlineUsers.values()) {
-				us.add(user);
-			}
-			return us;
-		}
+        fun getUser(name: String): OnlineUserInfo? = getOnlineUser(name)
 
-		public OnlineUserInfo getUser(String name) {
-			return P2PService.this.getOnlineUser(name);
-		}
-		public List<UserLocation> getUsersLocation() {
-			List<UserLocation> locations = new ArrayList<UserLocation>();
-			for (UserLocation location : mOnlineUsersLocation.values()) {
-				locations.add(location);
-			}
-			return locations;
-		}
-		public void OnlineUsersClear(){
-			mOnlineUsers.clear();
-			mOnlineUsersLocation.clear();
-		}
-//		public Map<String, ChatMessage> getConversationsMap() {
-//			return conversations;
-//		}
+        fun onlineUsersClear() {
+            onlineUsers.clear()
+            onlineUsersLocation.clear()
+        }
 
-//		public List<ChatMessage> getConversationsList() {
-//			List<ChatMessage> us = new ArrayList<ChatMessage>();
-//			for (ChatMessage user : conversations.values()) {
-//				us.add(user);
-//			}
-//			return us;
-//		}
-		
-		// 获取数据连接
-		public DataConnection getDataConnection() {
-			return mDataConnection;
-		}
-		
-		public ChatManager getChatManager() {
-			return mChatManager;
-		}
-	}
-	@Override
-	public void onCreate() {
-		super.onCreate();
-		me= WiFiChat.instance().getMe();
-		// 设置个人信息
-		mDataConnection = new DataConnection(this);
-		mChatManager = new ChatManager(mDataConnection);
-	}
+        val connection: DataConnection get() = dataConnection
 
-	
-	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
+        val manager: ChatManager get() = chatManager
+    }
 
-		return super.onStartCommand(intent, flags, startId);
-	}
+    override fun onBind(intent: Intent?): IBinder = binder
 
-	@Override
-	public void onDestroy() {
-		mDataConnection.onDestroy();
-	}
+    override fun onCreate() {
+        super.onCreate()
+        dataConnection = DataConnection(this)
+        chatManager = ChatManager(dataConnection)
+    }
 
-	public synchronized void addOnlineUser(OnlineUserInfo user) {
-		String frist_IP=user.getIpAdderss();//上一个用户IP
-		for (Map.Entry<String, OnlineUserInfo> usermap : mOnlineUsers.entrySet()) {
-			if (frist_IP.equals(usermap.getValue().getIpAdderss())&&!user.getUserName().equals(usermap.getValue().getUserName())) {
-				mOnlineUsers.remove(usermap.getKey());//剔除同一个机器的上一个用户，避免下线失败
-			}
-		}
-		if (!mOnlineUsers.containsKey(user.getUserName())) {//避免重复上线
-			mOnlineUsers.put(user.getUserName(), user);
-		}
-	}
-	
-	public void addOnlineUserLocation(UserLocation location) {
-		mOnlineUsersLocation.put(location.getUsername(), location);
-	}
-	
-	public OnlineUserInfo getOnlineUser(String userName) {
-		OnlineUserInfo user = null;
-		if (mOnlineUsers.containsKey(userName)) {
-			user = mOnlineUsers.get(userName);
-		}
-		return user;
-	}
-	public UserLocation getOnlineUserLocation(String userName) {
-		UserLocation location = null;
-		if (mOnlineUsersLocation.containsKey(userName)) {
-			location = mOnlineUsersLocation.get(userName);
-		}
-		return location;
-	}
-	public void delOnlineUser(String userName) {
-		mOnlineUsers.remove(userName);
-		mOnlineUsersLocation.remove(userName);
-	}
-	
-	public boolean isOnlineUser(String userName) {
-		return mOnlineUsers.containsKey(userName);
-	}
+    override fun onDestroy() {
+        super.onDestroy()
+        dataConnection.onDestroy()
+    }
 
-	public Map<String, OnlineUserInfo> getOnlineUsers() {
-		return mOnlineUsers;
-	}
+    /** 添加在线用户；同一 IP 的旧用户会被剔除，避免下线失败 */
+    @Synchronized
+    fun addOnlineUser(user: OnlineUserInfo) {
+        onlineUsers.entries.removeIf { (_, existing) ->
+            user.ipAdderss == existing.ipAdderss && user.userName != existing.userName
+        }
+        onlineUsers.putIfAbsent(user.userName, user)
+    }
 
+    fun addOnlineUserLocation(location: UserLocation) {
+        onlineUsersLocation[location.username.orEmpty()] = location
+    }
+
+    fun getOnlineUser(userName: String): OnlineUserInfo? = onlineUsers[userName]
+
+    fun getOnlineUserLocation(userName: String): UserLocation? = onlineUsersLocation[userName]
+
+    fun delOnlineUser(userName: String) {
+        onlineUsers.remove(userName)
+        onlineUsersLocation.remove(userName)
+    }
+
+    fun isOnlineUser(userName: String): Boolean = onlineUsers.containsKey(userName)
 }

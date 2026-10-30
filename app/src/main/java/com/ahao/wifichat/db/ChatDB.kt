@@ -1,273 +1,158 @@
-package com.ahao.wifichat.db;
+package com.ahao.wifichat.db
 
-import java.util.ArrayList;
-import java.util.List;
+import android.content.Context
+import android.util.Log
+import androidx.room.withTransaction
+import com.ahao.wifichat.WiFiChat
+import com.ahao.wifichat.net.file.FileState
+import com.ahao.wifichat.service.parcelable.OnlineUserInfo
+import com.ahao.wifichat.utlis.AppScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 
-import org.litepal.LitePal;
+/**
+ * 聊天数据仓库。读取返回 Flow（数据变化自动推送），写入为 suspend 函数。
+ * 首次启动时会把旧 LitePal 库（WiFIChat.db）的数据迁移到 Room。
+ */
+object ChatDB {
 
+    private const val TAG = "ChatDB"
+    private const val PREFS_MIGRATION = "db_migration"
+    private const val KEY_LEGACY_MIGRATED = "litepal_migrated"
 
-import android.database.Cursor;
-import android.text.TextUtils;
+    private lateinit var database: ChatDatabase
 
-import com.ahao.wifichat.WiFiChat;
-import com.ahao.wifichat.entity.ChatListMessage;
-import com.ahao.wifichat.net.file.FileState;
-import com.ahao.wifichat.service.parcelable.OnlineUserInfo;
+    private val dao: ChatDao get() = database.chatDao()
 
-public class ChatDB {
-	
-	private static ChatDB sInstance = null;
-	
-	public static ChatDB getInstance() {
-		if (sInstance == null)
-			sInstance = new ChatDB();
-		return sInstance;
-	}
-	
-	private ChatListMessage _getChatListMessage(Cursor cursor) {
-		if (cursor == null)
-			return null;
+    private val me: String get() = WiFiChat.instance.me.username.orEmpty()
 
-		int idx = -1;
-		ChatListMessage msg = new ChatListMessage();
-		if ((idx = cursor.getColumnIndex("other_username")) != -1)
-			msg.setUsername(cursor.getString(idx));
-		if ((idx = cursor.getColumnIndex("other_name")) != -1)
-			msg.setName(cursor.getString(idx));
-		if ((idx = cursor.getColumnIndex("type")) != -1)
-			msg.setType(cursor.getInt(idx));
-		if ((idx = cursor.getColumnIndex("content")) != -1)
-			msg.setContent(cursor.getString(idx));
-		if ((idx = cursor.getColumnIndex("msg_time")) != -1)
-			msg.setTime(cursor.getLong(idx));
-		return msg;
-		
-	}
-	
-	/**
-	 * 获取会话列表以时间排序
-	 * @param strCurUsername
-	 * @return 会话列表
-	 */
-	public List<ChatListMessage> queryChatList(String strCurUsername) {
-		String sql = String.format(
-				"select other_username,other_name,type,content,msg_time from user_msg T3 left join msg T4 on T3.msg_id=T4.id where  T3.id in (select id from (select id,max(msg_time) from (select T1.id id,other_username,msg_time from user_msg T1 left join msg T2 on T1.msg_id=T2.id where username = '%s') group by other_username)) order by msg_time desc",
-				strCurUsername);
-		Cursor cursor = LitePal.findBySQL(sql);
-		List<ChatListMessage> list = new ArrayList<ChatListMessage>();
+    fun init(context: Context) {
+        database = ChatDatabase.get(context)
+        AppScope.io.launch {
+            runCatching { migrateLegacyIfNeeded(context) }
+                .onFailure { Log.e(TAG, "迁移旧数据库失败", it) }
+        }
+    }
 
-		if (cursor != null && cursor.moveToFirst()) {
-			do {
-				list.add(_getChatListMessage(cursor));
-			} while (cursor.moveToNext());
-		}
-		return list;
-	}
-	
-	/**
-	 * 获取消息列表
-	 * @param strCurUsername
-	 * @param strOtherUsername
-	 * @return 消息列表
-	 */
-	public List<user_msg> queryChatMessage(String strCurUsername, String strOtherUsername) {
+    fun observeChatList(): Flow<List<ChatListRow>> = dao.observeChatList(me)
 
-		List<user_msg> list = LitePal.where("username = ? and other_username = ?", strCurUsername, strOtherUsername).find(user_msg.class, true);
-//		List<ChatMessage> msglist = new ArrayList<ChatMessage>();
-		return list;
-	}
-	
-	/**
-	 * 插入消息表
-	 * @param content
-	 * @param type
-	 * @param time
-	 * @param userList
-	 * @param attach
-	 * @return 消息id
-	 */
-	public int insertMsg(String content, int type, long time, List<user_msg> userList, msg_attachment attach) {
-		msg msg = new msg();
-		msg.setContent(content);
-		msg.setType(type);
-		msg.setMsg_time(time);
-		if (userList != null)
-			msg.setUserList(userList);
-		if (attach != null)
-			msg.setMsg_att(attach);
-		msg.save();
-		
-		return msg.getId();
-	}
-	
-	/**
-	 * 插入普通消息
-	 * @param dirType 方向
-	 * @param content
-	 * @param type
-	 * @param time
-	 * @param username
-	 * @param other
-	 * @return 消息id
-	 */
-	public int insertMessage(int dirType, String content, int type, long time, String username, OnlineUserInfo other) {
-		user_msg usermsg = new user_msg();
-		usermsg.setUsername(username);
-		usermsg.setDir_type(dirType);
-		usermsg.setOther_name(other.getName());
-		usermsg.setOther_username(other.getUserName());
-		if(DBConstants.DIR_TYPE_I == dirType)
-			usermsg.setStatus(DBConstants.SEND_STATUS_ING);
-		else 
-			usermsg.setIs_read(DBConstants.READ_N);
+    fun observeConversation(otherUsername: String): Flow<List<ChatMessageRow>> =
+        dao.observeConversation(me, otherUsername)
 
-		List<user_msg> userList = new ArrayList<user_msg>();
-		userList.add(usermsg);
-		usermsg.save();
+    fun observeUnreadTotal(): Flow<Int> = dao.observeUnreadTotal(me)
 
-		return insertMsg(content, type, time, userList, null);
-	}
-	
-	/**
-	 * 插入附件消息
-	 * @param dirType
-	 * @param content
-	 * @param type
-	 * @param time
-	 * @param username
-	 * @param other
-	 * @param file
-	 * @param filePath
-	 * @param uuid
-	 * @param status
-	 * @return 消息id
-	 */
-	public int insertMessage(int dirType, String content, int type, long time, String username, OnlineUserInfo other,
-							 FileState file, String filePath, String uuid, int status) {
+    /**
+     * 插入一条消息（以及可选的附件），返回消息 id。
+     * [other] 为空时（对方不在线的异常情况）只记录消息本身。
+     */
+    suspend fun insertMessage(
+        dirType: Int,
+        content: String?,
+        type: Int,
+        time: Long,
+        username: String,
+        other: OnlineUserInfo?,
+        file: FileState? = null,
+        filePath: String? = null,
+        uuid: String? = null,
+        attachmentStatus: Int = DBConstants.DOWNLOAD_ERR,
+    ): Int = database.withTransaction {
+        val attachmentId = file?.let {
+            dao.insertAttachment(
+                MsgAttachmentEntity(
+                    fileUuid = uuid,
+                    type = it.type,
+                    filename = it.fileName,
+                    size = it.fileSize,
+                    uri = filePath,
+                    status = attachmentStatus,
+                ),
+            ).toInt()
+        }
+        val msgId = dao.insertMsg(
+            MsgEntity(type = type, content = content, msgTime = time, msgAttId = attachmentId),
+        ).toInt()
+        val outgoing = dirType == DBConstants.DIR_TYPE_I
+        dao.insertUserMsg(
+            UserMsgEntity(
+                username = username,
+                dirType = dirType,
+                otherUsername = other?.userName,
+                otherName = other?.name,
+                status = if (outgoing) DBConstants.SEND_STATUS_ING else 0,
+                isRead = DBConstants.READ_N,
+                messageId = msgId,
+            ),
+        )
+        msgId
+    }
 
-		user_msg usermsg = new user_msg();
-		usermsg.setUsername(username);
-		usermsg.setDir_type(dirType);
-		usermsg.setOther_name(other.getName());
-		usermsg.setOther_username(other.getUserName());
+    /** 将 [time] 之前仍在“发送中”的消息标记为发送失败 */
+    suspend fun updateSendTimeOut(otherUsername: String, time: Long) {
+        dao.failTimedOutSends(me, otherUsername, time)
+    }
 
-		if (DBConstants.DIR_TYPE_I == dirType)
-			usermsg.setStatus(DBConstants.SEND_STATUS_ING);
-		else
-			usermsg.setIs_read(DBConstants.READ_N);
+    /** 将与对方的消息全部标记为已读 */
+    suspend fun updateReadStatus(otherUsername: String?) {
+        val myName = me
+        if (otherUsername.isNullOrEmpty() || myName.isEmpty()) return
+        dao.markConversationRead(myName, otherUsername)
+    }
 
-		List<user_msg> userList = new ArrayList<user_msg>();
-		userList.add(usermsg);
-		usermsg.save();
+    /** 更新发送状态：0 发送中，1 发送失败，2 对方已收到 */
+    suspend fun updateSendStatus(myName: String, otherUsername: String, msgId: Int, status: Int) {
+        dao.updateSendStatus(myName, otherUsername, msgId, status)
+    }
 
-		msg_attachment attach = new msg_attachment();
-		attach.setFile_uuid(uuid);
-		attach.setType(file.type);
-		attach.setFilename(file.fileName);
-		attach.setSize(file.fileSize);
-		attach.setUri(filePath);// 本地存储路径
-		attach.setStatus(status);
-		attach.save();
+    suspend fun updateDownloadStatus(fileUuid: String, status: Int) {
+        dao.updateDownloadStatus(fileUuid, status)
+    }
 
-		return insertMsg(content, type, time, userList, attach);
-	}
-	
-	/**
-	 * 将所有发送状态为'发送中'的消息都修改为'发送失败'
-	 * @param username
-	 * @param other_name
-	 * @param time
-	 */
-	public void updateSendTimeOut(String username, String other_name, long time) {
-		String sql = String.format(
-				"update user_msg set status = 1 where exists (select 1 from msg where username = '%s' and other_username = '%s' and msg_time < %d and status = 0 and user_msg.msg_id = msg.id)",
-				username, other_name, time);
-		Cursor cursor = LitePal.findBySQL(sql);
-		int count = 0;
-		if (cursor != null && cursor.moveToFirst()) {
-			count = cursor.getInt(0);
-		}
-//		return count;
-	}
+    /**
+     * 把 LitePal 的三张表（msg / user_msg / msg_attachment）原样复制到 Room 库。
+     * 只执行一次；旧库不存在时直接标记完成。
+     */
+    private suspend fun migrateLegacyIfNeeded(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_MIGRATION, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_LEGACY_MIGRATED, false)) return
 
-	/**
-	 * 获取该消息是否已读
-	 * 
-	 * @return
-	 */
-	public int findMessageRead(String myName, String youName) {
-	//		Cursor cursor = DataSupport.findBySQL("select * from user_msg where username=? and other_username=? and dir_type = ?",
-	//				myName, youName,String.valueOf(DBConstants.DIR_TYPE_Y));
-	//		ArrayList<Integer> count = new ArrayList<>();
-	//		while (cursor.moveToNext()) {
-	//			int is_read = cursor.getInt(cursor.getColumnIndex("is_read"));
-	//			if (is_read == 0) {
-	//				count.add(is_read);
-	//			}
-	//		}
-		List<user_msg> read = LitePal.select("is_read")
-				.where("username = ? and other_username =? and dir_type = ? and is_read =? ", myName, youName,String.valueOf(DBConstants.DIR_TYPE_Y),String.valueOf(DBConstants.READ_N)).find(user_msg.class);
-		return read.size();// 未读条数
-	}
+        val legacyFile = context.getDatabasePath(ChatDatabase.LEGACY_DB_NAME)
+        if (legacyFile.exists()) {
+            val sqlite = database.openHelper.writableDatabase
+            sqlite.execSQL("ATTACH DATABASE '${legacyFile.absolutePath}' AS legacy")
+            try {
+                database.withTransaction {
+                    val attExpr = if (hasLegacyColumn("msg", "msg_att_id")) "msg_att_id" else "NULL"
+                    val msgExpr = if (hasLegacyColumn("user_msg", "message_id")) "message_id" else "NULL"
+                    sqlite.execSQL(
+                        "INSERT OR IGNORE INTO msg_attachment (id, file_uuid, type, filename, size, uri, status) " +
+                            "SELECT id, file_uuid, type, filename, size, uri, status FROM legacy.msg_attachment",
+                    )
+                    sqlite.execSQL(
+                        "INSERT OR IGNORE INTO msg (id, type, content, msg_time, msg_att_id) " +
+                            "SELECT id, type, content, msg_time, $attExpr FROM legacy.msg",
+                    )
+                    sqlite.execSQL(
+                        "INSERT OR IGNORE INTO user_msg (id, username, dir_type, other_username, other_name, " +
+                            "status, is_read, message_id) SELECT id, username, dir_type, other_username, " +
+                            "other_name, status, is_read, $msgExpr FROM legacy.user_msg",
+                    )
+                }
+            } finally {
+                sqlite.execSQL("DETACH DATABASE legacy")
+            }
+        }
+        prefs.edit().putBoolean(KEY_LEGACY_MIGRATED, true).apply()
+    }
 
-	/**
-	 * 根据当前用户名找所有未读消息
-	 * 
-	 * @return
-	 */
-	public int findMessageReadAll() {
-		String myName = WiFiChat.instance().getMe().getUsername();
-		if (null == myName || TextUtils.isEmpty(myName)) {
-			return 0;
-		}
-		List<user_msg> readAll = LitePal.select("is_read").where("username = ? and dir_type = ? and is_read = ?", myName,String.valueOf(DBConstants.DIR_TYPE_Y),String.valueOf(DBConstants.READ_N)).find(user_msg.class);
-		return readAll.size();
-
-	}
-
-	/**
-	 * 跟新已读状态
-	 * 
-	 * @param youName
-	 */
-	public void updateReadStatus(String youName) {
-		String myName = WiFiChat.instance().getMe().getUsername();
-		if (null == youName || TextUtils.isEmpty(youName)) {
-			return;
-		}
-		if (null == myName || TextUtils.isEmpty(myName)) {
-			return;
-		}
-		user_msg user = new user_msg();
-		user.setIs_read(1);// 已读
-		user.updateAll("username = ? and other_username =?", myName, youName);
-//		List<user_msg> msgUsers = DataSupport.select("is_read")
-//				.where("username = ? and other_username =?", myName, youName).find(user_msg.class);
-	}
-
-	/**
-	 * 跟新发送状态
-	 * 
-	 * @param myName
-	 * @param youName
-	 *            0正在发送,1发送错误，2对方已经收到
-	 */
-
-	public static void updateSendStatus(String myName, String youName, int msg_id, int status) {
-		user_msg user = new user_msg();
-		user.setStatus(status);// 已读
-		user.updateAll("username = ? and other_username = ? and msg_id = ?", myName, youName, msg_id + "");
-	}
-
-	/**
-	 * 跟新下载状态 ，暂用不上
-	 * 
-	 * @param fileUUID
-	 * @param type
-	 */
-	public void updateDownloadStatus(String fileUUID, int type) {
-		msg_attachment attach = new msg_attachment();
-		attach.setStatus(type);
-		attach.updateAll("file_uuid =? ", fileUUID);
-	}
+    /** 查询旧库某表是否包含某列（旧结构中部分关联列可能不存在） */
+    private fun hasLegacyColumn(table: String, column: String): Boolean {
+        val cursor = database.openHelper.writableDatabase.query("PRAGMA legacy.table_info($table)")
+        cursor.use {
+            while (it.moveToNext()) {
+                if (it.getString(it.getColumnIndexOrThrow("name")) == column) return true
+            }
+        }
+        return false
+    }
 }

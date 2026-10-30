@@ -1,94 +1,70 @@
-package com.ahao.wifichat.widget;
-import com.ahao.wifichat.R;
-import android.app.Activity;
-import android.content.Context;
-import android.util.AttributeSet;
-import android.view.View;
-import android.widget.Button;
-import android.widget.ImageButton;
-import android.widget.LinearLayout;
-import android.widget.TextView;
+package com.ahao.wifichat.widget
 
-public class TitleView extends LinearLayout {
-	private Button mBackBtn;
-	private ImageButton mRightBtn;
-	private TextView mRightTxt;
-	private TextView mTitleText;
-	private Context context;
-	public TitleView(Context context) {
-		super(context);
-		initView(context);
-	}
+import android.app.Activity
+import android.content.Context
+import android.util.AttributeSet
+import android.view.View
+import android.widget.Button
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.TextView
+import com.ahao.wifichat.R
 
-	public TitleView(Context context, AttributeSet attrs) {
-		super(context, attrs);
-		initView(context);
-	}
+/** 页面顶部标题栏：返回按钮、标题、右侧按钮/文字 */
+class TitleView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyle: Int = 0,
+) : LinearLayout(context, attrs, defStyle) {
 
-	public TitleView(Context context, AttributeSet attrs, int defStyle) {
-		super(context, attrs, defStyle);
-		initView(context);
-	}
+    private val backBtn: Button
+    private val rightBtn: ImageButton
+    private val rightTxt: TextView
+    private val titleText: TextView
 
-	private void initView(Context context) {
-		this.context=context;
-		View.inflate(context, R.layout.p2p_title, this);
-		mBackBtn = (Button) findViewById(R.id.btn_back);
-		mBackBtn.setOnClickListener(new OnClickListener() {
-			
-			@Override
-			public void onClick(View v) {
-				Context context =getContext();
-				if (context instanceof Activity) {
-					((Activity) context).finish();
-				}
-			}
-		});
-		mRightBtn = (ImageButton) findViewById(R.id.rightBtn);
-		mTitleText = (TextView) findViewById(R.id.header_text);
-		mRightTxt = (TextView) findViewById(R.id.rightTxt);
-	}
+    init {
+        View.inflate(context, R.layout.p2p_title, this)
+        backBtn = findViewById(R.id.btn_back)
+        rightBtn = findViewById(R.id.rightBtn)
+        rightTxt = findViewById(R.id.rightTxt)
+        titleText = findViewById(R.id.header_text)
+        backBtn.setOnClickListener { (getContext() as? Activity)?.finish() }
+    }
 
+    fun setBackVisibility(visibility: Int) {
+        backBtn.visibility = visibility
+    }
 
-	public void setBackVisibility(int visibility) {
-		mBackBtn.setVisibility(visibility);
-	}
-	public void setRightClickListener(OnClickListener listener){
-		mRightBtn.setOnClickListener(listener);
-	}
+    fun setBackOnClickListener(listener: OnClickListener) {
+        backBtn.setOnClickListener(listener)
+    }
 
-	public void setBackOnClickListener(OnClickListener listener) {
-		mBackBtn.setOnClickListener(listener);
-	}
+    fun setRightClickListener(listener: OnClickListener) {
+        rightBtn.setOnClickListener(listener)
+    }
 
-	public void setRightResource(int resId) {
-		mRightBtn.setImageResource(resId);
-	}
+    fun setRightResource(resId: Int) {
+        rightBtn.setImageResource(resId)
+    }
 
-	public void setRightText(int txtId) {
-		mRightTxt.setText(txtId);
-	}
+    fun setRightText(txtId: Int) {
+        rightTxt.setText(txtId)
+    }
 
-	public void setRightText(String strText) {
-		mRightTxt.setText(strText);
-	}
+    fun setRightText(text: CharSequence?) {
+        rightTxt.text = text
+    }
 
-	public void setRightVisibility(int visibility) {
-		mRightBtn.setVisibility(visibility);
-		mRightTxt.setVisibility(visibility);
-	}
+    fun setRightVisibility(visibility: Int) {
+        rightBtn.visibility = visibility
+        rightTxt.visibility = visibility
+    }
 
-	public void setTitle(int resId) {
-		mTitleText.setText(resId);
-	}
+    fun setTitle(resId: Int) {
+        titleText.setText(resId)
+    }
 
-	public void setTitle(String txt) {
-		mTitleText.setText(txt);
-	}
-
-	public int getRightButtonId() {
-		return mRightBtn.getId();
-	}
-
-
+    fun setTitle(text: CharSequence?) {
+        titleText.text = text
+    }
 }

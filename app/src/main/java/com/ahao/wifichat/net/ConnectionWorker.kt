@@ -1,358 +1,140 @@
+package com.ahao.wifichat.net
 
-/***************************************************************************
- *   Copyright 2006-2016 by Christian Ihle                                 *
- *   contact@kouchat.net                                                   *
- *                                                                         *
- *   This file is part of KouChat.                                         *
- *                                                                         *
- *   KouChat is free software; you can redistribute it and/or modify       *
- *   it under the terms of the GNU Lesser General Public License as        *
- *   published by the Free Software Foundation, either version 3 of        *
- *   the License, or (at your option) any later version.                   *
- *                                                                         *
- *   KouChat is distributed in the hope that it will be useful,            *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU      *
- *   Lesser General Public License for more details.                       *
- *                                                                         *
- *   You should have received a copy of the GNU Lesser General Public      *
- *   License along with KouChat.                                           *
- *   If not, see <http://www.gnu.org/licenses/>.                           *
- ***************************************************************************/
-
-package com.ahao.wifichat.net;
-
-import com.ahao.wifichat.entity.Userinfo;
-import com.ahao.wifichat.event.NetworkConnectionListener;
-import com.ahao.wifichat.misc.ErrorHandler;
-import com.ahao.wifichat.utlis.Validate;
-
-import java.net.NetworkInterface;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-
-
+import com.ahao.wifichat.entity.Userinfo
+import com.ahao.wifichat.event.NetworkConnectionListener
+import com.ahao.wifichat.utlis.NetworkUtils
+import java.net.NetworkInterface
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.logging.Logger
 
 /**
- * This thread is responsible for keeping the application connected
- * to the network.
- *
- * Every now and then, the thread will check if there are better
- * networks available, and reconnect to that network instead.
- *
- * @author Christian Ihle
+ * 网络监测线程：周期性检查可用网卡，在网络上线/下线/切换时通知监听器。
  */
-public class ConnectionWorker implements Runnable {
+class ConnectionWorker(private val userinfo: Userinfo) : Runnable {
 
-    /** The logger. */
-    private static final Logger LOG = Logger.getLogger(ConnectionWorker.class.getName());
+    private val listeners = CopyOnWriteArrayList<NetworkConnectionListener>()
 
-    /** Period of time to sleep if network is up. 60 sec. */
-    private static final int SLEEP_UP = 1000 * 60;
+    @Volatile
+    private var run = false
 
-    /** Period of time to sleep if network is down. 15 sec. */
-    private static final int SLEEP_DOWN = 1000 * 15;
+    @Volatile
+    var isNetworkUp = false
+        private set
 
-    private final NetworkUtils networkUtils = new NetworkUtils();
+    private var networkInterface: NetworkInterface? = null
+    private var worker: Thread? = null
 
-    /** Indicates whether the thread should run or not. */
-    private boolean run;
+    /** 当前网卡（若已失效则返回最新的同名网卡） */
+    val currentNetworkInterface: NetworkInterface?
+        get() = NetworkUtils.getUpdatedNetworkInterface(networkInterface) ?: networkInterface
 
-    /** Whether the network is up or not. */
-    private boolean networkUp;
+    val isAlive: Boolean get() = worker?.isAlive ?: false
 
-    /** The current network interface. */
-    private NetworkInterface networkInterface;
-
-    /** The working thread. */
-    private Thread worker;
-
-    /** A list of connection listeners. */
-    private final List<NetworkConnectionListener> listeners;
-
-    /** For locating the operating system's choice of network interface. */
-//    private final OperatingSystemNetworkInfo osNetworkInfo;
-
-    /** The settings to use for the network. */
-//    private final Settings settings;
-    private final Userinfo userinfo;
-
-    /**
-     * Constructor.
-     *
-     * @param errorHandler The error handler to use.
-     */
-    public ConnectionWorker(final Userinfo userinfo, final ErrorHandler errorHandler) {
-//        Validate.notNull(settings, "Settings can not be null");
-        Validate.notNull(errorHandler, "Error handler can not be null");
-
-//        this.settings = settings;
-        this.userinfo = userinfo;
-        listeners = new ArrayList<NetworkConnectionListener>();
-//        osNetworkInfo = new OperatingSystemNetworkInfo(errorHandler);
+    override fun run() {
+        LOG.fine("Network is starting")
+        while (run) {
+            val networkUp = updateNetwork()
+            if (!run) break
+            try {
+                Thread.sleep(if (networkUp) SLEEP_UP else SLEEP_DOWN)
+            } catch (e: InterruptedException) {
+                // 被 stop() 或 checkNetwork() 中断
+                LOG.fine(e.toString())
+            }
+        }
+        LOG.fine("Network is stopping")
+        if (isNetworkUp) notifyNetworkDown(false)
+        networkInterface = null
     }
 
-    /**
-     * The thread. See {@link #updateNetwork()} for details.
-     */
-    @Override
-    public void run() {
-        LOG.log(Level.FINE, "Network is starting");
+    fun checkNetwork() {
+        worker?.interrupt()
+    }
 
-        while (run) {
-            final boolean networkUp = updateNetwork();
+    @Synchronized
+    private fun updateNetwork(): Boolean {
+        val netif = selectNetworkInterface()
 
-            if (!run) {
-                break;
+        when {
+            // 没有可用网卡
+            !NetworkUtils.isUsable(netif) -> {
+                LOG.fine("Network is down")
+                if (isNetworkUp) notifyNetworkDown(false)
+                return false
             }
-
-            try {
-                if (networkUp) {
-                    Thread.sleep(SLEEP_UP);
+            // 切换网卡，例如从有线切换到无线
+            !NetworkUtils.sameNetworkInterface(netif, networkInterface) -> {
+                LOG.fine("Changing network from ${networkInterface?.name ?: "[null]"} to ${netif?.name}")
+                networkInterface = netif
+                if (isNetworkUp) {
+                    notifyNetworkDown(true)
+                    notifyNetworkUp(true)
                 } else {
-                    Thread.sleep(SLEEP_DOWN);
+                    notifyNetworkUp(false)
                 }
             }
-
-            // Sleep interrupted - probably from stop() or checkNetwork()
-            catch (final InterruptedException e) {
-                LOG.log(Level.FINE, e.toString());
+            // 同一网卡重新恢复连接，例如重新插上网线
+            !isNetworkUp -> {
+                LOG.fine("Network ${netif?.name} is up again")
+                networkInterface = netif
+                notifyNetworkUp(false)
             }
         }
-
-        LOG.log(Level.FINE, "Network is stopping");
-
-        if (networkUp) {
-            notifyNetworkDown(false);
-        }
-
-        networkInterface = null;
+        // 其它情况：原连接仍然有效
+        return true
     }
 
-    /**
-     * Asks the thread to check the network now to detect loss of network connectivity.
-     */
-    public void checkNetwork() {
-        if (worker != null) {
-            worker.interrupt();
-        }
+    @Synchronized
+    private fun notifyNetworkUp(silent: Boolean) {
+        listeners.forEach { it.beforeNetworkCameUp() }
+        isNetworkUp = true
+        listeners.forEach { it.networkCameUp(silent) }
     }
 
-    /**
-     * Checks the state of the network, and tries to keep the best possible
-     * network connection up. Listeners are notified of any changes.
-     *
-     * @return If the network is up or not after this update is done.
-     */
-    private synchronized boolean updateNetwork() {
-        final NetworkInterface netif = selectNetworkInterface();
-
-        // No network interface to connect with
-        if (!networkUtils.isUsable(netif)) {
-            LOG.log(Level.FINE, "Network is down");
-
-            if (networkUp) {
-                notifyNetworkDown(false);
-            }
-
-            return false;
-        }
-
-        // Switching network interface, like going from cable to wireless
-        else if (isNewNetworkInterface(netif)) {
-            final String origNetwork = networkInterface == null ? "[null]" : networkInterface.getName();
-            LOG.log(Level.FINE, "Changing network from " + origNetwork + " to " + netif.getName());
-            networkInterface = netif;
-
-            if (networkUp) {
-                notifyNetworkDown(true);
-                notifyNetworkUp(true);
-            }
-
-            else {
-                notifyNetworkUp(false);
-            }
-        }
-
-        // If the connection was lost, like unplugging cable, and plugging back in
-        else if (!networkUp) {
-            LOG.log(Level.FINE, "Network " + netif.getName() + " is up again");
-            networkInterface = netif;
-            notifyNetworkUp(false);
-        }
-
-        // Else, the old connection is still up
-
-        return true;
+    @Synchronized
+    private fun notifyNetworkDown(silent: Boolean) {
+        isNetworkUp = false
+        listeners.forEach { it.networkWentDown(silent) }
     }
 
-    /**
-     * Compares <code>netif</code> with the current network interface.
-     *
-     * @param netif The new network interface to compare against the original.
-     * @return True if netif is new.
-     */
-    private boolean isNewNetworkInterface(final NetworkInterface netif) {
-        return !networkUtils.sameNetworkInterface(netif, networkInterface);
+    fun registerNetworkConnectionListener(listener: NetworkConnectionListener) {
+        listeners += listener
     }
 
-    /**
-     * Notifies all the listeners that they can prepare to be notified that the network is up.
-     */
-    private synchronized void notifyBeforeNetworkUp() {
-        for (final NetworkConnectionListener listener : listeners) {
-            listener.beforeNetworkCameUp();
+    @Synchronized
+    fun start() {
+        if (!run && !isAlive) {
+            run = true
+            worker = Thread(this, "ConnectionWorker").also { it.start() }
         }
     }
 
-    /**
-     * Notifies all the listeners that the network is up.
-     *
-     * @param silent Don't give any messages to the user about the change.
-     */
-    private synchronized void notifyNetworkUp(final boolean silent) {
-        notifyBeforeNetworkUp();
-
-        networkUp = true;
-
-        for (final NetworkConnectionListener listener : listeners) {
-            listener.networkCameUp(silent);
-        }
+    fun stop() {
+        run = false
+        worker?.interrupt()
     }
 
-    /**
-     * Notifies all the listeners that the network is down.
-     *
-     * @param silent Don't give any messages to the user about the change.
-     */
-    private synchronized void notifyNetworkDown(final boolean silent) {
-        networkUp = false;
-
-        for (final NetworkConnectionListener listener : listeners) {
-            listener.networkWentDown(silent);
-        }
-    }
-
-    /**
-     * Registers the listener as a connection listener.
-     *
-     * @param listener The listener to register.
-     */
-    public void registerNetworkConnectionListener(final NetworkConnectionListener listener) {
-        listeners.add(listener);
-    }
-
-    /**
-     * Starts a new thread if no thread is already running.
-     */
-    public synchronized void start() {
-        if (!run && !isAlive()) {
-            run = true;
-            worker = new Thread(this, "ConnectionWorker");
-            worker.start();
-        }
-    }
-
-    /**
-     * Stops the thread.
-     */
-    public void stop() {
-        run = false;
-
-        if (worker != null) {
-            worker.interrupt();
-        }
-    }
-
-    /**
-     * Locates the best network interface to use.
-     *
-     * <ol>
-     *   <li>The first priority is the network interface selected in the settings.</li>
-     *   <li>The second priority is the operating system's choice of network interface.</li>
-     *   <li>The last priority is KouChat's own choice of network interface.</li>
-     * </ol>
-     *
-     * <p>If no usable network interfaces are found, then <code>null</code>
-     * is returned.</p>
-     *
-     * @return The network interface found, or <code>null</code>.
-     * @see NetworkUtils#isUsable(NetworkInterface)
-     */
-    private NetworkInterface selectNetworkInterface() {
-        final NetworkInterface firstUsableNetIf = networkUtils.findFirstUsableNetworkInterface();
-
-        if (firstUsableNetIf == null) {
-            LOG.log(Level.FINER, "No usable network interface detected.");
-            return null;
+    /** 优先使用配置中保存的网卡，否则使用第一个可用网卡 */
+    private fun selectNetworkInterface(): NetworkInterface? {
+        val firstUsable = NetworkUtils.findFirstUsableNetworkInterface()
+        if (firstUsable == null) {
+            LOG.finer("No usable network interface detected.")
+            return null
         }
 
-        final NetworkInterface savedNetworkInterface =
-                networkUtils.getNetworkInterfaceByName(userinfo.getIpAdderss());
-
-        if (networkUtils.isUsable(savedNetworkInterface)) {
-            LOG.log(Level.FINER, "Using saved network interface: \n" +
-                    networkUtils.getNetworkInterfaceInfo(savedNetworkInterface));
-            return savedNetworkInterface;
+        val saved = NetworkUtils.getNetworkInterfaceByName(userinfo.ipAdderss)
+        if (NetworkUtils.isUsable(saved)) {
+            LOG.finer("Using saved network interface: \n${NetworkUtils.getNetworkInterfaceInfo(saved)}")
+            return saved
         }
 
-        LOG.log(Level.FINER, "Saved network interface '" + userinfo.getIpAdderss() + "' is invalid: \n" +
-                networkUtils.getNetworkInterfaceInfo(savedNetworkInterface));
-
-//        final NetworkInterface osNetIf = osNetworkInfo.getOperatingSystemNetworkInterface();
-//
-//        if (networkUtils.isUsable(osNetIf)) {
-//            LOG.log(Level.FINER, "Using operating system's choice of network interface: \n" +
-//                    networkUtils.getNetworkInterfaceInfo(osNetIf));
-//            return osNetIf;
-//        }
-
-//        LOG.finer("The operating system suggested the following invalid network interface: \n" +
-//                networkUtils.getNetworkInterfaceInfo(osNetIf));
-//        LOG.log(Level.FINER, "Overriding operating system's choice of network interface with: \n" +
-//                networkUtils.getNetworkInterfaceInfo(firstUsableNetIf));
-
-        return firstUsableNetIf;
+        LOG.finer("Saved network interface '${userinfo.ipAdderss}' is invalid: \n${NetworkUtils.getNetworkInterfaceInfo(saved)}")
+        return firstUsable
     }
 
-    /**
-     * Finds the current network interface.
-     *
-     * @return The current network interface.
-     */
-    public NetworkInterface getCurrentNetworkInterface() {
-        final NetworkInterface updatedNetworkInterface =
-                networkUtils.getUpdatedNetworkInterface(networkInterface);
-
-        if (updatedNetworkInterface != null) {
-            return updatedNetworkInterface;
-        }
-
-        return networkInterface;
-    }
-
-    /**
-     * Checks if the network is up.
-     *
-     * @return If the network is up.
-     */
-    public boolean isNetworkUp() {
-        return networkUp;
-    }
-
-    /**
-     * Checks if the thread is alive.
-     *
-     * @return If the thread is alive.
-     */
-    public boolean isAlive() {
-        if (worker == null) {
-            return false;
-        } else {
-            return worker.isAlive();
-        }
+    private companion object {
+        val LOG: Logger = Logger.getLogger(ConnectionWorker::class.java.name)
+        const val SLEEP_UP = 1000 * 60L
+        const val SLEEP_DOWN = 1000 * 15L
     }
 }

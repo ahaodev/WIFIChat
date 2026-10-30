@@ -1,54 +1,30 @@
-package com.ahao.wifichat.ui.chat.video;
+package com.ahao.wifichat.ui.chat.video
 
-import android.app.Activity;
-import android.content.ContentResolver;
-import android.view.WindowManager;
-import android.widget.Toast;
-import android.provider.Settings.System;
+import android.app.Activity
+import android.view.WindowManager
 
-public class LightnessController {
-	
-	// 判断是否开启了自动亮度调节
-	public static boolean isAutoBrightness(Activity act) {
-		boolean automicBrightness = false;
-		ContentResolver aContentResolver = act.getContentResolver();
-		try {
-			automicBrightness = System.getInt(aContentResolver,
-					System.SCREEN_BRIGHTNESS_MODE) == System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC;
-		} catch (Exception e) {
-			Toast.makeText(act, "无法获取亮度", Toast.LENGTH_SHORT).show();
-		}
-		return automicBrightness;
-	}
+/**
+ * 屏幕亮度控制，仅作用于当前窗口（无需 WRITE_SETTINGS 等系统权限）。
+ * 亮度取值 0 ~ 255，与系统设置保持一致的刻度。
+ */
+object LightnessController {
 
-	// 改变亮度
-	public static void setLightness(Activity act, int value) {
-		try {
-			System.putInt(act.getContentResolver(), System.SCREEN_BRIGHTNESS, value);
-			WindowManager.LayoutParams lp = act.getWindow().getAttributes();
-			lp.screenBrightness = (value <= 0 ? 1 : value) / 255f;
-			act.getWindow().setAttributes(lp);
-		} catch (Exception e) {
-			Toast.makeText(act, "无法改变亮度", Toast.LENGTH_SHORT).show();
-		}
-	}
+    /** 当前窗口亮度（0 ~ 255）；未覆盖时返回 -1 */
+    fun getLightness(activity: Activity): Int {
+        val brightness = activity.window.attributes.screenBrightness
+        return if (brightness < 0) -1 else (brightness * 255).toInt()
+    }
 
-	// 获取亮度
-	public static int getLightness(Activity act) {
-		return System.getInt(act.getContentResolver(), System.SCREEN_BRIGHTNESS, -1);
-	}
+    fun setLightness(activity: Activity, value: Int) {
+        val lp: WindowManager.LayoutParams = activity.window.attributes
+        lp.screenBrightness = (if (value <= 0) 1 else value.coerceAtMost(255)) / 255f
+        activity.window.attributes = lp
+    }
 
-	// 停止自动亮度调节
-	public static void stopAutoBrightness(Activity activity) {
-		System.putInt(activity.getContentResolver(),
-				System.SCREEN_BRIGHTNESS_MODE,
-				System.SCREEN_BRIGHTNESS_MODE_MANUAL);
-	}
-
-	// 开启亮度自动调节
-	public static void startAutoBrightness(Activity activity) {
-		System.putInt(activity.getContentResolver(),
-				System.SCREEN_BRIGHTNESS_MODE,
-				System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC);
-	}
+    /** 恢复系统默认亮度（退出页面时调用） */
+    fun resetLightness(activity: Activity) {
+        val lp = activity.window.attributes
+        lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        activity.window.attributes = lp
+    }
 }

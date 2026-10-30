@@ -1,13 +1,12 @@
-package com.ahao.wifichat.protocol;
+package com.ahao.wifichat.protocol
 
-public class SerialNumberUtils {
-	
-	private static int sn = 0;
-    
-    public synchronized static int getNewNumIdx() {
-		++sn;
-		if (sn < 0)
-			sn = 0;
-		return sn;
-	}
+/** 数据包流水号生成器，溢出后回绕到 0 */
+object SerialNumberUtils {
+    private var sn = 0
+
+    @Synchronized
+    fun next(): Int {
+        sn = (sn + 1).takeIf { it >= 0 } ?: 0
+        return sn
+    }
 }

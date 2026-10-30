@@ -1,79 +1,64 @@
-package com.ahao.wifichat.ui;
+package com.ahao.wifichat.ui
 
-import android.app.Activity;
-import android.content.Intent;
-import android.content.pm.ActivityInfo;
-import android.os.Bundle;
-import android.os.Parcelable;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.Window;
+import androidx.activity.ComponentActivity
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.os.Bundle
+import android.os.Parcelable
+import android.view.View
+import android.view.ViewGroup
+import android.view.Window
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import com.ahao.wifichat.WiFiChat
 
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+abstract class BaseActivity : ComponentActivity() {
 
-import com.ahao.wifichat.WiFiChat;
+    protected val app: WiFiChat get() = WiFiChat.instance
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        requestWindowFeature(Window.FEATURE_NO_TITLE)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        app.activityManager.pushActivity(this)
+    }
 
-public class BaseActivity extends Activity {
-	protected WiFiChat app = WiFiChat.instance();
+    override fun onContentChanged() {
+        super.onContentChanged()
+        applySystemBarInsets()
+    }
 
-	@Override
-	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		// 设置无标题
-		requestWindowFeature(Window.FEATURE_NO_TITLE);
-		// 垂直显示
-		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-		app.getActivityManager().pushActivity(this);
-	}
+    /** 让内容避开状态栏与导航栏 */
+    protected fun applySystemBarInsets() {
+        val contentParent = findViewById<ViewGroup>(android.R.id.content) ?: return
+        if (contentParent.childCount == 0) return
+        val rootView = contentParent.getChildAt(0)
+        val pl = rootView.paddingLeft
+        val pt = rootView.paddingTop
+        val pr = rootView.paddingRight
+        val pb = rootView.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { v: View, windowInsets ->
+            val insets: Insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(pl + insets.left, pt + insets.top, pr + insets.right, pb + insets.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+    }
 
-	@Override
-	public void onContentChanged() {
-		super.onContentChanged();
-		applySystemBarInsets();
-	}
+    override fun onDestroy() {
+        super.onDestroy()
+        app.activityManager.popActivity(this)
+    }
 
-	/**
-	 * 为根布局应用系统栏内边距，防止内容被状态栏和导航栏遮挡
-	 */
-	protected void applySystemBarInsets() {
-		ViewGroup contentParent = findViewById(android.R.id.content);
-		if (contentParent != null && contentParent.getChildCount() > 0) {
-			View rootView = contentParent.getChildAt(0);
-			final int pl = rootView.getPaddingLeft();
-			final int pt = rootView.getPaddingTop();
-			final int pr = rootView.getPaddingRight();
-			final int pb = rootView.getPaddingBottom();
-			ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
-				Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-				v.setPadding(pl + insets.left, pt + insets.top, pr + insets.right, pb + insets.bottom);
-				return WindowInsetsCompat.CONSUMED;
-			});
-		}
-	}
+    fun startActivity(cls: Class<*>) {
+        startActivity(Intent(this, cls))
+    }
 
-	@Override
-	protected void onDestroy() {
-		super.onDestroy();
-		app.getActivityManager().popActivity(this);
-	}
+    fun startActivity(cls: Class<*>, key: String, bundle: Bundle) {
+        startActivity(Intent(this, cls).putExtra(key, bundle))
+    }
 
-	public void startActivity(Class<?> cls) {
-		Intent intent = new Intent(this, cls);
-		startActivity(intent);
-	}
-
-	public void startActivity(Class<?> cls, String key, Bundle bundle) {
-		Intent intent = new Intent(this, cls);
-		intent.putExtra(key, bundle);
-		startActivity(intent);
-	}
-
-	public void startActivity(Class<?> cls, String key, Parcelable parcelable) {
-		Intent intent = new Intent(this, cls);
-		intent.putExtra(key, parcelable);
-		startActivity(intent);
-	}
+    fun startActivity(cls: Class<*>, key: String, parcelable: Parcelable) {
+        startActivity(Intent(this, cls).putExtra(key, parcelable))
+    }
 }

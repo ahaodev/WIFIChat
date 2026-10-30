@@ -1,119 +1,73 @@
-package com.ahao.wifichat.ui.chatlist;
+package com.ahao.wifichat.ui.chatlist
 
-import android.annotation.SuppressLint;
-import android.os.Bundle;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.View.OnClickListener;
-import android.view.ViewGroup;
-import android.widget.ListView;
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ListView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.ahao.wifichat.R
+import com.ahao.wifichat.db.ChatDB
+import com.ahao.wifichat.db.ChatListRow
+import com.ahao.wifichat.db.DBConstants
+import com.ahao.wifichat.service.parcelable.OnlineUserInfo
+import com.ahao.wifichat.ui.BaseFragment
+import com.ahao.wifichat.ui.adapter.CommonAdapter
+import com.ahao.wifichat.ui.adapter.ViewHolder
+import com.ahao.wifichat.ui.chat.ChatActivity
+import com.ahao.wifichat.utlis.StringUtils
+import kotlinx.coroutines.launch
 
-import com.ahao.wifichat.R;
-import com.ahao.wifichat.WiFiChat;
-import com.ahao.wifichat.db.ChatDB;
-import com.ahao.wifichat.db.DBConstants;
-import com.ahao.wifichat.entity.ChatListMessage;
-import com.ahao.wifichat.service.parcelable.OnlineUserInfo;
-import com.ahao.wifichat.ui.BaseFragment;
-import com.ahao.wifichat.ui.MainActivity;
-import com.ahao.wifichat.ui.adapter.CommonAdapter;
-import com.ahao.wifichat.ui.adapter.ViewHolder;
-import com.ahao.wifichat.ui.chat.ChatActivity;
-import com.ahao.wifichat.utlis.StringUtils;
+/** 会话列表：订阅数据库 Flow，数据变化时自动刷新 */
+class ChatListFragment : BaseFragment() {
 
-import java.util.ArrayList;
-import java.util.List;
+    private lateinit var listView: ListView
+    private lateinit var chatAdapter: CommonAdapter<ChatListRow>
 
-public class ChatListFragment extends BaseFragment {
-	private MainActivity main;
-	private View v;
-	private ListView mListView;
-	private CommonAdapter<ChatListMessage> chatAdapter;
-	private List<ChatListMessage> users = new ArrayList<ChatListMessage>();
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        val v = inflater.inflate(R.layout.p2p_fragment_chatlist, null)
+        listView = v.findViewById(R.id.chat_fragment_listview)
+        chatAdapter = object : CommonAdapter<ChatListRow>(requireActivity(), emptyList(), R.layout.item_chatlist) {
+            override fun convert(helper: ViewHolder, item: ChatListRow?) {
+                item ?: return
+                val peer = item.otherUsername.orEmpty()
+                helper.setText(R.id.tvcontacts, item.otherName)
+                helper.setText(R.id.tvcontent, previewOf(item))
+                helper.setText(R.id.tvtime, StringUtils.formatTime(item.time))
 
-	@SuppressLint("InflateParams")
-	@Override
-	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-		v = inflater.inflate(R.layout.p2p_fragment_chatlist, null);
-		init(v);
-		return v;
-	}
+                val online = app.binder?.getUser(peer) != null
+                helper.setBackgroundResource(R.id.chperson, if (online) R.drawable.wechat_down else R.drawable.wechat)
 
-	@Override
-	public void onResume() {
-		super.onResume();
-		main = (MainActivity) getActivity();
-	}
-
-	@Override
-	public void onPause() {
-		super.onPause();
-	}
-
-	private void init(View v) {
-		mListView = v.findViewById(R.id.chat_fragment_listview);
-		chatAdapter = new CommonAdapter<>(getActivity(), users, R.layout.item_chatlist) {
-
-            @Override
-            public void convert(ViewHolder helper, final ChatListMessage item) {
-                // helper.setImageBitmap(R.id.chperson, null);
-                helper.setText(R.id.tvcontacts, item.getName());
-                helper.setText(R.id.tvcontent, item.getContent());
-                helper.setText(R.id.tvtime, StringUtils.formatTime(item.getTime()));
-                helper.setVisibility(R.id.tvTip, View.GONE);
-                if (null == app.getBinder().getUser(item.getUsername())) {
-                    helper.setBackgroundResource(R.id.chperson, R.drawable.wechat);
+                if (item.unread > 0) {
+                    helper.setVisibility(R.id.tvTip, View.VISIBLE)
+                    helper.setText(R.id.tvTip, item.unread.toString())
                 } else {
-                    helper.setBackgroundResource(R.id.chperson, R.drawable.wechat_down);
+                    helper.goNone(R.id.tvTip)
                 }
-                int read = ChatDB.getInstance().findMessageRead(WiFiChat.instance().getMe().getUsername(),
-                        item.getUsername());
-                if (read > 0) {
-                    helper.setVisibility(R.id.tvTip, View.VISIBLE);
-                    helper.setText(R.id.tvTip, read + "");
-                }
-                // helper.setImageResource(R.id.iv_group_type,
-                // R.drawable.sel_chatting_add_btn);
-                helper.setOnclick(R.id.chatlist_click, new OnClickListener() {
 
-                    @Override
-                    public void onClick(View v) {
-                        OnlineUserInfo user = app.getBinder().getUser(item.getUsername());
-                        if (null == user) {// 不在线
-                            user = new OnlineUserInfo();
-                            user.setUserName(item.getUsername());
-                            user.setOnline(0);
-                        }
-                        startActivity(ChatActivity.class, ChatActivity.USER, user);
-                    }
-                });
+                helper.setOnClick(R.id.chatlist_click) {
+                    // 不在线的用户仍可打开历史会话
+                    val user = app.binder?.getUser(peer) ?: OnlineUserInfo(userName = peer, online = 0)
+                    startActivity(ChatActivity::class.java, ChatActivity.USER, user)
+                }
             }
-        };
-		mListView.setAdapter(chatAdapter);
-		chatAdapter.notifyDataSetChanged(getChatListMessage());
-	}
+        }
+        listView.adapter = chatAdapter
 
-	public void notifyDate() {
-		chatAdapter.notifyDataSetChanged(getChatListMessage());
-	}
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                ChatDB.observeChatList().collect { rows -> chatAdapter.notifyDataSetChanged(rows) }
+            }
+        }
+        return v
+    }
 
-	private List<ChatListMessage> getChatListMessage() {
-		users = ChatDB.getInstance().queryChatList(app.getMe().getUsername());
-		for (ChatListMessage chatListMessage : users) {
-			switch (chatListMessage.getType()) {
-			case DBConstants.MSG_TYPE_TXT:
-
-				break;
-			case DBConstants.MSG_TYPE_LOCATION:
-				chatListMessage.setContent("[位置]");
-				break;
-			case DBConstants.MSG_TYPE_FILE:
-				chatListMessage.setContent("[附件]");
-				break;
-			default:
-				break;
-			}
-		}
-		return users;
-	}
+    /** 多媒体消息在列表中显示占位文字 */
+    private fun previewOf(row: ChatListRow): String? = when (row.type) {
+        DBConstants.MSG_TYPE_LOCATION -> "[位置]"
+        DBConstants.MSG_TYPE_FILE -> "[附件]"
+        else -> row.content
+    }
 }

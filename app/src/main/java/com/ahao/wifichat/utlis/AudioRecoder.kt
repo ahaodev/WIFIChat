@@ -1,107 +1,82 @@
-package com.ahao.wifichat.utlis;
+package com.ahao.wifichat.utlis
 
-import java.io.File;
-import java.text.SimpleDateFormat;
+import android.annotation.SuppressLint
+import android.content.Context
+import android.media.MediaRecorder
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 
-import android.annotation.SuppressLint;
-import android.content.Context;
-import android.media.MediaRecorder;
-
+/** 语音录制器（AMR，最长 60 秒） */
 @SuppressLint("SimpleDateFormat")
-public class AudioRecoder {
+class AudioRecoder {
 
-	private long startTime;
-	private long mDuration;
-	private String mRecordFile;
-	private boolean bRun;
+    var startTime: Long = 0L
+        private set
 
-	private MediaRecorder mRecorder;
+    /** 录音时长（秒） */
+    var duration: Long = 0L
+        private set
 
-    public AudioRecoder(){
+    var recordPath: String? = null
+        private set
 
+    var isRun: Boolean = false
+        private set
+
+    private var recorder: MediaRecorder? = null
+
+    fun startRecord(ctx: Context) {
+        isRun = true
+
+        val date = SimpleDateFormat("yyyyMMddhhmmss").format(Date())
+        val file = File(ctx.getExternalFilesDir("chat"), "RecordFile_$date.amr")
+        recordPath = file.absolutePath
+        if (file.exists()) file.delete()
+
+        release()
+
+        val rec = MediaRecorder()
+        recorder = rec
+        val started = runCatching {
+            rec.setAudioSource(MediaRecorder.AudioSource.MIC)
+            rec.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB)
+            rec.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
+            rec.setMaxDuration(60 * 1000)
+            rec.setOutputFile(recordPath)
+            rec.prepare()
+            rec.start()
+        }.onFailure { it.printStackTrace() }.isSuccess
+        if (!started) {
+            release()
+            isRun = false
+            return
+        }
+        duration = 0L
+        startTime = System.currentTimeMillis()
     }
 
-	public void startRecord(Context ctx) {
-        bRun = true;
+    fun stopRecord() {
+        val rec = recorder ?: return
+        if (!isRun) return
 
+        duration = (System.currentTimeMillis() - startTime) / 1000
 
- 		/* 设置输出文件的路径 */
-        SimpleDateFormat sDateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
-        String date = sDateFormat.format(new java.util.Date());
-        File dir = ctx.getExternalFilesDir("chat");
-        File file = new File(dir, "RecordFile_" + date + ".amr");
-        mRecordFile = file.getAbsolutePath();
-        if (file.exists()) {
-            file.delete();
-        }
+        runCatching {
+            rec.stop()
+            release()
+        }.onFailure { it.printStackTrace() }
+        isRun = false
+    }
 
-        release();
+    val amplitude: Int get() = recorder?.maxAmplitude ?: 0
 
-        mRecorder = new MediaRecorder();
-        try {
-            mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);// 设置麦克风
-            mRecorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
-            mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-            mRecorder.setMaxDuration(60*1000);
-            mRecorder.setOutputFile(mRecordFile);
-            mRecorder.prepare();
-            mRecorder.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-            release();
-            bRun = false;
-            return;
-        }
-		mDuration = 0;
-		startTime = System.currentTimeMillis();
-
-	}
-
-	public void stopRecord() {
-		if (mRecorder == null || !bRun)
-			return;
-
-		mDuration = (long) (Math.ceil(System.currentTimeMillis() - startTime) / 1000.0);
-
-		try {
-			mRecorder.stop();
-            release();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		bRun = false;
-	}
-    public String getRecordPath() {
-		return mRecordFile;
-	}
-
-	public long getStartTime() {
-		return startTime;
-	}
-
-	public long getDuration() {
-		return mDuration;
-	}
-
-	public boolean isRun() {
-		return bRun;
-	}
-	
-	public int getAmplitude() {
-		if(mRecorder != null) {
-			return mRecorder.getMaxAmplitude();
-		}
-		return 0;
-	}
-
-    private void release(){
-        if(mRecorder != null){
-            try{
-                mRecorder.release(); //释放录音资源
-                mRecorder = null;
-            }catch(Exception e){
-                e.printStackTrace();
-            }
+    private fun release() {
+        recorder?.let { rec ->
+            runCatching {
+                rec.release()
+                recorder = null
+            }.onFailure { it.printStackTrace() }
         }
     }
 }

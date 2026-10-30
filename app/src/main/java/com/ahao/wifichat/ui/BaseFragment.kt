@@ -1,39 +1,30 @@
-package com.ahao.wifichat.ui;
+package com.ahao.wifichat.ui
 
+import android.content.Intent
+import android.os.Bundle
+import android.os.Parcelable
+import android.util.Log
+import androidx.fragment.app.Fragment
+import com.ahao.wifichat.WiFiChat
 
-import android.content.Intent;
-import android.os.Bundle;
-import android.os.Parcelable;
-import android.util.Log;
+abstract class BaseFragment : Fragment() {
 
-import androidx.fragment.app.Fragment;
+    protected val app: WiFiChat get() = WiFiChat.instance
 
-import com.ahao.wifichat.WiFiChat;
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        Log.e("ClassLoder", javaClass.`package`.toString() + javaClass.simpleName)
+    }
 
-public class BaseFragment extends Fragment {
-	protected WiFiChat app;
+    fun startActivity(cls: Class<*>) {
+        requireActivity().startActivity(Intent(activity, cls))
+    }
 
-	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		 app= WiFiChat.instance();
-		Log.e("ClassLoder", this.getClass().getPackage().toString() + getClass().getSimpleName());
-	}
+    fun startActivity(cls: Class<*>, key: String, bundle: Bundle) {
+        requireActivity().startActivity(Intent(activity, cls).putExtra(key, bundle))
+    }
 
-	public void startActivity(Class<?> cls) {
-		Intent intent = new Intent(getActivity(), cls);
-		getActivity().startActivity(intent);
-	}
-
-	public void startActivity(Class<?> cls, String key, Bundle bundle) {
-		Intent intent = new Intent(getActivity(), cls);
-		intent.putExtra(key, bundle);
-		getActivity().startActivity(intent);
-	}
-
-	public void startActivity(Class<?> cls, String key, Parcelable parcelable) {
-		Intent intent = new Intent(getActivity(), cls);
-		intent.putExtra(key, parcelable);
-		getActivity().startActivity(intent);
-	}
+    fun startActivity(cls: Class<*>, key: String, parcelable: Parcelable) {
+        requireActivity().startActivity(Intent(activity, cls).putExtra(key, parcelable))
+    }
 }

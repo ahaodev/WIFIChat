@@ -1,103 +1,32 @@
+package com.ahao.wifichat.settings
 
-/***************************************************************************
- *   Copyright 2006-2016 by Christian Ihle                                 *
- *   contact@kouchat.net                                                   *
- *                                                                         *
- *   This file is part of KouChat.                                         *
- *                                                                         *
- *   KouChat is free software; you can redistribute it and/or modify       *
- *   it under the terms of the GNU Lesser General Public License as        *
- *   published by the Free Software Foundation, either version 3 of        *
- *   the License, or (at your option) any later version.                   *
- *                                                                         *
- *   KouChat is distributed in the hope that it will be useful,            *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU      *
- *   Lesser General Public License for more details.                       *
- *                                                                         *
- *   You should have received a copy of the GNU Lesser General Public      *
- *   License along with KouChat.                                           *
- *   If not, see <http://www.gnu.org/licenses/>.                           *
- ***************************************************************************/
+import com.ahao.wifichat.misc.User
+import com.ahao.wifichat.utlis.Tools
 
-package com.ahao.wifichat.settings;
-
-
-import com.ahao.wifichat.misc.User;
-import com.ahao.wifichat.utlis.Tools;
-
-/**
- * Factory for creating <code>me</code>, the application user.
- *
- * @author Christian Ihle
- */
-public class MeFactory {
+/** 创建应用用户 `me` */
+object MeFactory {
 
     /**
-     * Creates <code>me</code>, the application user.
-     *
-     * <p>Note: there must only be one instance of <code>me</code> used in the application.
-     * Use {@link Settings#getMe()} to access the correct instance.</p>
-     *
-     * <p>Sets the following values:</p>
-     *
-     * <ul>
-     *   <li>A random user code.</li>
-     *   <li>Nick name from the system property <code>user.name</code>, or the user code if property is invalid.</li>
-     *   <li>Time of logon.</li>
-     *   <li>Time when last idle.</li>
-     *   <li>Operating name from the system property <code>os.name</code>.</li>
-     * </ul>
-     *
-     * @return Me.
+     * 随机唯一码、系统用户名作为昵称（无效时用唯一码）、登录时间与操作系统名称。
      */
-    public User createMe() {
-        final int code = createUniqueCode();
-        final String nickName = createNickName(code);
-
-        final User me = new User(nickName, code);
-
-        me.setMe(true);
-        me.setLastIdle(System.currentTimeMillis());
-        me.setLogonTime(System.currentTimeMillis());
-        me.setOperatingSystem(System.getProperty("os.name"));
-
-        return me;
+    fun createMe(): User {
+        val code = createUniqueCode()
+        return User(nick = createNickName(code), code = code).apply {
+            isMe = true
+            lastIdle = System.currentTimeMillis()
+            logonTime = System.currentTimeMillis()
+            operatingSystem = System.getProperty("os.name") ?: operatingSystem
+        }
     }
 
-    /**
-     * Creates a random number between 10000000 and 20000000.
-     *
-     * @return Unique code for this user.
-     */
-    private int createUniqueCode() {
-        return 10000000 + (int) (Math.random() * 9999999);
-    }
+    /** 10000000 ~ 20000000 之间的随机数 */
+    private fun createUniqueCode(): Int = 10_000_000 + (Math.random() * 9_999_999).toInt()
 
-    /**
-     * Creates a new default nick name from the name of the user logged in to
-     * the operating system. The name is shortened to 10 characters and the
-     * first letter is capitalized.
-     *
-     * <p>If the name is invalid as a nick name then the user code is used instead.</p>
-     *
-     * @param code The user code.
-     * @return The created nick name.
-     */
-    private String createNickName(final int code) {
-        final String userName = System.getProperty("user.name");
-
-        if (userName == null) {
-            return Integer.toString(code);
-        }
-
-        final String[] splitUserName = userName.split(" ");
-        final String defaultNick = Tools.capitalizeFirstLetter(Tools.shorten(splitUserName[0].trim(), 10));
-
-        if (Tools.isValidNick(defaultNick)) {
-            return defaultNick;
-        }
-
-        return Integer.toString(code);
+    /** 取系统用户名的第一段，截断到 10 位并首字母大写；不合法则使用唯一码 */
+    private fun createNickName(code: Int): String {
+        val userName = System.getProperty("user.name") ?: return code.toString()
+        val firstPart = userName.split(" ")[0].trim()
+        val defaultNick = Tools.capitalizeFirstLetter(Tools.shorten(firstPart, 10))
+        return if (Tools.isValidNick(defaultNick)) defaultNick else code.toString()
     }
 }

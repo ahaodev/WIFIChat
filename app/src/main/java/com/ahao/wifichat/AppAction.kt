@@ -1,17 +1,16 @@
-package com.ahao.wifichat;
+package com.ahao.wifichat
 
-public interface AppAction {
+object AppAction {
+    object SHREAD {
+        const val USER = "user"
+    }
 
-	interface SHREAD {
-		final String USER = "user";
-	}
+    object KEY {
+        const val USER_NAME = "user_name"
+        const val USER_NUMBER = "user_number"
+    }
 
-	interface KEY {
-		final String USER_NAME = "user_name";
-		final String USER_NUMBER = "user_number";
-	}
-
-	interface ACTIVITY {
-		final int LOCATION = 1;
-	}
+    object ACTIVITY {
+        const val LOCATION = 1
+    }
 }

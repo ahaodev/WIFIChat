@@ -1,150 +1,74 @@
+package com.ahao.wifichat.net.socket
 
-/***************************************************************************
- *   Copyright 2006-2016 by Christian Ihle                                 *
- *   contact@kouchat.net                                                   *
- *                                                                         *
- *   This file is part of KouChat.                                         *
- *                                                                         *
- *   KouChat is free software; you can redistribute it and/or modify       *
- *   it under the terms of the GNU Lesser General Public License as        *
- *   published by the Free Software Foundation, either version 3 of        *
- *   the License, or (at your option) any later version.                   *
- *                                                                         *
- *   KouChat is distributed in the hope that it will be useful,            *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU      *
- *   Lesser General Public License for more details.                       *
- *                                                                         *
- *   You should have received a copy of the GNU Lesser General Public      *
- *   License along with KouChat.                                           *
- *   If not, see <http://www.gnu.org/licenses/>.                           *
- ***************************************************************************/
+import com.ahao.wifichat.misc.ErrorHandler
+import com.ahao.wifichat.net.Constants
+import java.io.IOException
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
+import java.util.logging.Level
+import java.util.logging.Logger
 
-package com.ahao.wifichat.net.socket;
+/** UDP 单播发送 */
+class UDPSender(private val errorHandler: ErrorHandler) {
 
-import com.ahao.wifichat.misc.ErrorHandler;
-import com.ahao.wifichat.net.Constants;
-import com.ahao.wifichat.utlis.Validate;
+    private var udpSocket: DatagramSocket? = null
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+    @Volatile
+    private var connected = false
 
+    fun send(message: String, ip: String?, port: Int): Boolean {
+        val socket = udpSocket
+        if (!connected || socket == null) return false
 
-
-
-/**
- * Sends UDP packets directly to a user. Useful for private chat,
- * where not everyone should get the packets.
- *
- * @author Christian Ihle
- */
-public class UDPSender {
-
-    /** The logger. */
-    private static final Logger LOG = Logger.getLogger(UDPSender.class.getName());
-
-    /** The datagram socket used for sending messages. */
-    private DatagramSocket udpSocket;
-
-    /** If connected to the network or not. */
-    private boolean connected;
-
-    /** The error handler for registering important messages. */
-    private final ErrorHandler errorHandler;
-
-    /**
-     * Default constructor.
-     *
-     * @param errorHandler The error handler to use.
-     */
-    public UDPSender(final ErrorHandler errorHandler) {
-        Validate.notNull(errorHandler, "Error handler can not be null");
-
-        this.errorHandler = errorHandler;
+        return try {
+            val encodedMsg = message.toByteArray(charset(Constants.MESSAGE_CHARSET))
+            val size = encodedMsg.size
+            if (size > Constants.NETWORK_PACKET_SIZE) {
+                LOG.log(
+                    Level.WARNING,
+                    "Message was $size bytes, which is too large.\n The receiver might not get the complete message.\n'$message'",
+                )
+            }
+            socket.send(DatagramPacket(encodedMsg, size, InetAddress.getByName(ip), port))
+            LOG.fine { "Sent message: $message to $ip:$port" }
+            true
+        } catch (e: IOException) {
+            LOG.log(Level.SEVERE, "Could not send message: $message", e)
+            false
+        }
     }
 
-    /**
-     * Sends a packet with a message to a user.
-     *
-     * @param message The message to send.
-     * @param ip The ip address of the user.
-     * @param port The port to send the message to.
-     * @return If the message was sent or not.
-     */
-    public boolean send(final String message, final String ip, final int port) {
+    @Synchronized
+    fun startSender() {
+        LOG.fine("Connecting...")
         if (connected) {
-            try {
-                final InetAddress address = InetAddress.getByName(ip);
-                final byte[] encodedMsg = message.getBytes(Constants.MESSAGE_CHARSET);
-                final int size = encodedMsg.length;
-
-                if (size > Constants.NETWORK_PACKET_SIZE) {
-                    LOG.log(Level.WARNING, "Message was " + size + " bytes, which is too large.\n" +
-                            " The receiver might not get the complete message.\n'" + message + "'");
-                }
-
-                final DatagramPacket packet = new DatagramPacket(encodedMsg, size, address, port);
-                udpSocket.send(packet);
-                LOG.log(Level.FINE, "Sent message: " + message + " to " + ip + ":" + port);
-
-                return true;
-            }
-
-            catch (final IOException e) {
-                LOG.log(Level.SEVERE, "Could not send message: " + message, e);
-            }
+            LOG.fine("Already connected.")
+            return
         }
-
-        return false;
-    }
-
-    /**
-     * Creates a new UDP socket.
-     */
-    public void startSender() {
-        LOG.log(Level.FINE, "Connecting...");
-
-        if (connected) {
-            LOG.log(Level.FINE, "Already connected.");
-        }
-
-        else {
-            try {
-                udpSocket = new DatagramSocket();
-                connected = true;
-                LOG.log(Level.FINE, "Connected.");
-            }
-
-            catch (final IOException e) {
-                LOG.log(Level.SEVERE, e.toString(), e);
-                errorHandler.showError("Failed to initialize network:\n" + e +
-                        "\n\nYou will not be able to send private messages!");
-            }
+        try {
+            udpSocket = DatagramSocket()
+            connected = true
+            LOG.fine("Connected.")
+        } catch (e: IOException) {
+            LOG.log(Level.SEVERE, e.toString(), e)
+            errorHandler.showError("Failed to initialize network:\n$e\n\nYou will not be able to send private messages!")
         }
     }
 
-    /**
-     * Closes the UDP socket.
-     */
-    public void stopSender() {
-        LOG.log(Level.FINE, "Disconnecting...");
-
+    @Synchronized
+    fun stopSender() {
+        LOG.fine("Disconnecting...")
         if (!connected) {
-            LOG.log(Level.FINE, "Not connected.");
+            LOG.fine("Not connected.")
+            return
         }
+        connected = false
+        udpSocket?.takeIf { !it.isClosed }?.close()
+        LOG.fine("Disconnected.")
+    }
 
-        else {
-            connected = false;
-
-            if (udpSocket != null && !udpSocket.isClosed()) {
-                udpSocket.close();
-            }
-
-            LOG.log(Level.FINE, "Disconnected.");
-        }
+    private companion object {
+        val LOG: Logger = Logger.getLogger(UDPSender::class.java.name)
     }
 }

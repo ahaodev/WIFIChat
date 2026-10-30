@@ -1,28 +1,14 @@
-package com.ahao.wifichat.net;
+package com.ahao.wifichat.net
 
+import com.ahao.wifichat.service.parcelable.OnlineUserInfo
+import java.util.concurrent.Callable
 
-import com.ahao.wifichat.service.parcelable.OnlineUserInfo;
-
-import java.util.concurrent.Callable;
-
-public class SendDataUDP implements Callable<Boolean> {
-	
-	private final String privMsg;
-	private final OnlineUserInfo destUser;
-	private final NetworkService mNetworkService;
-	
-	public SendDataUDP(final NetworkService networkService,final OnlineUserInfo user, final String privMsg) {
-		// TODO Auto-generated constructor stub
-		this.privMsg = privMsg;
-		this.destUser = user;
-		this.mNetworkService = networkService;
-	}
-
-	@Override
-	public Boolean call() throws Exception {
-		// TODO Auto-generated method stub
-		boolean sent = mNetworkService.sendUDPMsg(privMsg, destUser.getIpAdderss(), destUser.getPort());
-		return sent;
-	}
-
+/** 通过 UDP 向指定用户发送一条已编码的数据 */
+class SendDataUDP(
+    private val networkService: NetworkService,
+    private val destUser: OnlineUserInfo,
+    private val privMsg: String,
+) : Callable<Boolean> {
+    override fun call(): Boolean =
+        networkService.sendUDPMsg(privMsg, destUser.ipAdderss, destUser.port)
 }

@@ -1,87 +1,46 @@
-package com.ahao.wifichat;
+package com.ahao.wifichat
 
-import java.lang.ref.WeakReference;
-import java.util.Iterator;
-import java.util.Stack;
+import android.app.Activity
+import java.lang.ref.WeakReference
 
-import android.app.Activity;
+/** 维护已打开的 Activity 栈（弱引用，不阻止回收） */
+class ActivityManager {
 
-public class ActivityManager {
+    private val activityStack = mutableListOf<WeakReference<Activity>>()
 
-	private final Stack<WeakReference<Activity>> activityStack = new Stack<WeakReference<Activity>>();
+    private fun removeActivity(find: Activity) {
+        activityStack.removeAll { ref -> ref.get().let { it == null || it === find } }
+    }
 
-	private void removeActivity(Activity find) {
-		Iterator<WeakReference<Activity>> iter = activityStack.iterator();
-		while (iter.hasNext()) {
-			WeakReference<Activity> item = iter.next();
+    fun popActivity(activity: Activity) = removeActivity(activity)
 
-			Activity activity = item.get();
-			if (activity == null) {
-				iter.remove();
-			} else if (activity == find) {
-				iter.remove();
-				break;
-			}
-		}
-	}
+    /** 按类名查找仍存活的 Activity */
+    fun getActivity(className: String): Activity? {
+        activityStack.removeAll { it.get() == null }
+        return activityStack.firstNotNullOfOrNull { ref ->
+            ref.get()?.takeIf { it.javaClass.name == className }
+        }
+    }
 
-	public void popActivity(Activity activity) {
-		removeActivity(activity);
-	}
+    fun pushActivity(activity: Activity) {
+        activityStack += WeakReference(activity)
+    }
 
-	public Activity getActivity(String className) {
-		Iterator<WeakReference<Activity>> iter = activityStack.iterator();
-		while (iter.hasNext()) {
-			WeakReference<Activity> item = iter.next();
+    fun clear() {
+        activityStack.forEach { it.get()?.finish() }
+        activityStack.clear()
+    }
 
-			Activity activity = item.get();
-			if (activity == null) {
-				iter.remove();
-			} else {
-				String curName = activity.getClass().getName();
-				if (curName.compareTo(className) == 0)
-					return activity;
-			}
-		}
-		return null;
-	}
+    /** 结束栈中第一个类型为 [cls] 的 Activity */
+    fun finishActivity(cls: Class<*>) {
+        val ref = activityStack.firstOrNull { it.get()?.javaClass == cls } ?: return
+        ref.get()?.finish()
+        activityStack.remove(ref)
+    }
 
-	public void pushActivity(Activity activity) {
-		activityStack.add(new WeakReference<Activity>(activity));
-	}
-
-	public void clear() {
-		Iterator<WeakReference<Activity>> iter = activityStack.iterator();
-		while (iter.hasNext()) {
-			WeakReference<Activity> item = iter.next();
-			Activity activity = item.get();
-			if (activity != null) {
-				activity.finish();
-			}
-		}
-
-		activityStack.clear();
-	}
-	/**
-	 * 通过类型结束栈中指定的Activity
-	 * @param cls
-	 */
-	public void finishActivity(Class<?> cls) {
-		for (WeakReference<Activity> weakReference : activityStack) {
-			Activity activity = weakReference.get();
-			if (activity.getClass().equals(cls)) {
-				activity.finish();
-				activityStack.remove(activity);
-				break;
-			}
-		}
-	}
-
-	public void finishActivity(Activity activity) {
-		if (activity != null) {
-			activityStack.remove(activity);
-			activity.finish();
-			activity = null;
-		}
-	}
+    fun finishActivity(activity: Activity?) {
+        activity ?: return
+        removeActivity(activity)
+        activity.finish()
+    }
 }

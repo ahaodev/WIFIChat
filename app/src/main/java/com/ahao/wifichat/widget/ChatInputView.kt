@@ -1,421 +1,283 @@
-package com.ahao.wifichat.widget;
-
-import java.util.ArrayList;
-
-import com.ahao.wifichat.R;
-import com.ahao.wifichat.ui.adapter.CommonAdapter;
-import com.ahao.wifichat.ui.adapter.ViewHolder;
-import com.ahao.wifichat.ui.chat.ChatActivity;
-import com.ahao.wifichat.utlis.AudioRecoder;
-
-import android.Manifest;
-import android.app.Activity;
-import android.app.Service;
-import android.content.pm.PackageManager;
-import android.content.Context;
-import android.os.Handler;
-import android.os.Vibrator;
-import android.text.Editable;
-import android.text.TextWatcher;
-import android.util.AttributeSet;
-import android.util.DisplayMetrics;
-import android.view.MotionEvent;
-import android.view.View;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
-import android.widget.GridView;
-import android.widget.ImageButton;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
-/**
- * 聊天底部文字语音输入视图
- * 
- * @author hao.ruan
- *
- */
-public class ChatInputView extends LinearLayout {
-	private static final int REQUEST_RECORD_AUDIO_PERMISSION = 1001;
-	private ImageButton mBtnAddition;
-	private LinearLayout mInputbody_layout;
-	private Button mBtnSend;
-	private TextView mInput;
-	private Button btnSpeak;
-	private ImageButton mBtnSwitch;
-	private ArrayList<AdditionItem> items = new ArrayList<AdditionItem>();
-	private GridView grid;
-	private CommonAdapter<AdditionItem> adapter;
-	private InputClickListener inputClickListener;
-	private final AudioRecoder mAudioRecoder = new AudioRecoder();
-	private int miScreenHeight = 0;
-	private Context mContext;
-	
-	public ChatInputView(Context context) {
-		super(context);
-		initView(context);
-	}
-
-	public ChatInputView(Context context, AttributeSet attrs) {
-		super(context, attrs);
-		initView(context);
-	}
-
-	public ChatInputView(Context context, AttributeSet attrs, int defStyle) {
-		super(context, attrs, defStyle);
-		initView(context);
-	}
-
-	private void initView(Context context) {
-		View.inflate(context, R.layout.p2p_view_chat_input, this);
-		this.mContext=context;
-		mHandler = new Handler();
-		m_vibrator = (Vibrator) mContext.getApplicationContext().getSystemService(
-				Service.VIBRATOR_SERVICE);
-		mBtnAddition = (ImageButton) findViewById(R.id.btnAddition);
-		mBtnAddition.setOnClickListener(mClickListener);
-
-		mInputbody_layout = (LinearLayout) findViewById(R.id.inputbody_layout);
-
-		mBtnSend = (Button) findViewById(R.id.btnSend);
-		mBtnSend.setOnClickListener(mClickListener);
-
-		mInput = (TextView) findViewById(R.id.TxtInput);
-		mInput.setOnTouchListener(touchListener);
-
-		btnSpeak = (Button) findViewById(R.id.btnSpeak);
-		btnSpeak.setOnTouchListener(mInputTouchListener);
-
-		mBtnSwitch = (ImageButton) findViewById(R.id.btnSwitch);
-		mBtnSwitch.setOnClickListener(mClickListener);
-
-		mInput.addTextChangedListener(textWatcher);
-
-		/** ----- 隐藏的底部选项 ------ **/
-		items.add(new AdditionItem(R.string.photo, R.drawable.icon_chat_add_photo));
-		items.add(new AdditionItem(R.string.video, R.drawable.icon_chat_add_video));
-		// new AdditionItem(R.string.voice, R.drawable.icon_chat_add_voice),
-		items.add(new AdditionItem(R.string.location, R.drawable.icon_chat_add_location));
-		// items.add(new AdditionItem(R.string.card,
-		// R.drawable.icon_chat_add_card));
-		items.add(new AdditionItem(R.string.File, R.drawable.icon_chat_add_file));
-
-		grid = (GridView) findViewById(R.id.p2p_chat_input_grid);
-
-		adapter = new CommonAdapter<AdditionItem>(context, items, R.layout.p2p_view_chat_input_textview) {
-
-			@Override
-			public void convert(ViewHolder helper, final AdditionItem item) {
-				if (helper.getConvertView() instanceof TextView) {
-					((TextView) helper.getConvertView()).setCompoundDrawablesWithIntrinsicBounds(null,
-							getResources().getDrawable(item.resId), null, null);
-					((TextView) helper.getConvertView()).setText(item.textId);
-					((TextView) helper.getConvertView()).setOnClickListener(new OnClickListener() {
-						@Override
-						public void onClick(View v) {
-							switch (item.resId) {
-							case R.drawable.icon_chat_add_photo:
-								inputClickListener.sendImage();
-								break;
-							case R.drawable.icon_chat_add_video:
-								inputClickListener.sendVideo();
-								break;
-							case R.drawable.icon_chat_add_location:
-								inputClickListener.sendLocation();
-								break;
-							case R.drawable.icon_chat_add_file:
-								inputClickListener.sendFile();
-								break;
-							default:
-								break;
-							}
-						}
-					});
-				}
-			}
-		};
-		grid.setAdapter(adapter);
-		hideKeyBode();
-	}
-
-	private class AdditionItem {
-		public final int textId;
-		public final int resId;
-
-		public AdditionItem(int t, int id) {
-			textId = t;
-			resId = id;
-		}
-	}
-
-	private final OnClickListener mClickListener = new OnClickListener() {
-
-		@Override
-		public void onClick(View v) {
-			if (v.getId() == R.id.btnSwitch) {
-				hideGroud();
-				if (btnSpeak.getVisibility() != View.GONE) {
-					mBtnSwitch.setImageResource(R.drawable.chat_input_voice);
-					btnSpeak.setVisibility(View.GONE);
-				} else {
-					mBtnSwitch.setImageResource(R.drawable.chat_input_keyboard);
-					btnSpeak.setVisibility(View.VISIBLE);
-					mInput.setText("");
-					hideKeyBode();
-				}
-			} else if (v.getId() == R.id.btnAddition) {
-				hideKeyBode();
-				if (grid.getVisibility() == View.GONE) {
-					grid.setVisibility(View.VISIBLE);
-					if (mContext instanceof ChatActivity) {
-						ChatActivity chat =(ChatActivity) mContext;
-						chat.smoothScroll(chat.adapter.getCount() - 1);
-					}
-				} else {
-					grid.setVisibility(View.GONE);
-				}
-
-			} else if (v.getId() == R.id.btnSend) { // 发送文本
-				String ret = mInput.getText().toString();
-				mInput.setText("");
-				inputClickListener.sendMessage(ret);
-			}
-		}
-
-	};
-	private final OnTouchListener touchListener = new OnTouchListener() {
-
-		@Override
-		public boolean onTouch(View v, MotionEvent event) {
-			if (v == mInput && event.getAction() == MotionEvent.ACTION_DOWN) {
-				hideGroud();
-			}
-			return false;
-		}
-	};
-
-	private boolean mReadyToCancelRecorder;
-	private boolean mNeedStartRecorder;
-	private Vibrator m_vibrator;
-
-	public interface AudioRecordCallback {
-		void onRecording(int iTime, int amplitude);
-
-		void onStartRecord();
-
-		void onReadyCancel();
-
-		void onReturnNormal();
-		
-		void onStopRecord();
-		/**
-		 * 正常完成录音
-		 * @param path
-		 */
-		void recodEnd(String path);
-	}
-
-	 public void setOnAudioRecordListener(AudioRecordCallback listener) {
-		this.audioCall = listener;
-	}
-
-	private AudioRecordCallback audioCall;
-	private final Runnable runnable = new Runnable() {
-
-		@Override
-		public void run() {
-			if (mAudioRecoder == null)
-				return;
-
-			if (mNeedStartRecorder && !mAudioRecoder.isRun()) {
-				// 震动
-				m_vibrator.vibrate(30);
-
-				if (audioCall != null)
-					audioCall.onStartRecord();
-				mAudioRecoder.startRecord(mContext.getApplicationContext());
-			}
-			if (!mNeedStartRecorder) {
-				return;
-			}
-
-			int timedis = (int) (System.currentTimeMillis() - mAudioRecoder.getStartTime()) / 1000;
-
-			if (audioCall != null)
-
-				audioCall.onRecording(timedis, mAudioRecoder.getAmplitude());
-
-			if (timedis < 60)
-				mHandler.postDelayed(runnable, 100);
-			else {
-				sendVoice();
-				btnSpeak.setSelected(false);
-			}
-		}
-	};
-	private final OnTouchListener mInputTouchListener = new OnTouchListener() {
-		float downy = 0;
-
-		@Override
-		public boolean onTouch(View arg0, MotionEvent arg1) {
-			int action = arg1.getAction() & MotionEvent.ACTION_MASK;
-			if (action == MotionEvent.ACTION_DOWN) {
-				// Check RECORD_AUDIO permission before starting recording
-				if (ContextCompat.checkSelfPermission(mContext, Manifest.permission.RECORD_AUDIO)
-						!= PackageManager.PERMISSION_GRANTED) {
-					if (mContext instanceof Activity) {
-						ActivityCompat.requestPermissions((Activity) mContext,
-								new String[]{Manifest.permission.RECORD_AUDIO},
-								REQUEST_RECORD_AUDIO_PERMISSION);
-					}
-					return false;
-				}
-				downy = arg1.getY();
-
-				mNeedStartRecorder = true;
-				mReadyToCancelRecorder = false;
-				btnSpeak.setText(R.string.release_end);
-				btnSpeak.setBackgroundResource(R.drawable.details_sendmsg_btn);
-				mHandler.removeCallbacks(runnable);
-				mHandler.postDelayed(runnable, 150);
-
-			} else if (action == MotionEvent.ACTION_UP) {
-				if (mReadyToCancelRecorder) {
-					mNeedStartRecorder = false;
-					btnSpeak.setText(R.string.down_speak);
-					mHandler.removeCallbacks(runnable);
-					mAudioRecoder.stopRecord();
-					btnSpeak.setBackgroundResource(R.drawable.input_btn_normal);
-					if (audioCall != null)
-						audioCall.onStopRecord();
-				} else {
-					mNeedStartRecorder = false;
-					sendVoice();
-				}
-			}
-			if (action == MotionEvent.ACTION_MOVE) {
-
-				int iMoveDis = miScreenHeight / 10;
-				// 滑动取消录音
-				if (downy - arg1.getY() >= iMoveDis) {
-
-					if (!mReadyToCancelRecorder) {
-						// 震动
-						m_vibrator.vibrate(30);
-						btnSpeak.setText(R.string.release_cancel);
-						if (audioCall != null)
-							audioCall.onReadyCancel();
-					}
-					mReadyToCancelRecorder = true;
-
-				} else {
-					if (mReadyToCancelRecorder) {
-						if (audioCall != null)
-							audioCall.onReturnNormal();
-						btnSpeak.setText(R.string.release_end);
-					}
-					mReadyToCancelRecorder = false;
-				}
-			}
-			return false;
-		}
-	};
-	private Handler mHandler;
-
-	private void sendVoice() {
-		// 震动
-		m_vibrator.vibrate(30);
-
-		btnSpeak.setText(R.string.down_speak);
-		btnSpeak.setBackgroundResource(R.drawable.input_btn_normal);
-		mHandler.removeCallbacks(runnable);
-
-		if (mAudioRecoder == null || !mAudioRecoder.isRun())
-			return;
-
-		mAudioRecoder.stopRecord();
-		if (audioCall != null)
-			audioCall.onStopRecord();
-		if (audioCall != null && mAudioRecoder.getDuration() > 0) {
-			String path = mAudioRecoder.getRecordPath();
-
-			audioCall.recodEnd(path);
-		}
-		if (mAudioRecoder.getDuration() <= 0) {
-			Toast.makeText(mContext, "录制时间太短", Toast.LENGTH_SHORT).show();
-		}
-	}
-
-	private final TextWatcher textWatcher = new TextWatcher() {
-
-		@Override
-		public void afterTextChanged(Editable s) {
-			if (mInput.getText().length() > 0) {
-				mBtnAddition.setVisibility(View.GONE);
-				mBtnSend.setVisibility(View.VISIBLE);
-			} else {
-				mBtnAddition.setVisibility(View.VISIBLE);
-				mBtnSend.setVisibility(View.GONE);
-			}
-		}
-
-		@Override
-		public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-		}
-
-		@Override
-		public void onTextChanged(CharSequence s, int start, int before, int count) {
-		}
-
-	};
-	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-		DisplayMetrics dm = new DisplayMetrics();
-		dm = getContext().getResources()
-				.getDisplayMetrics();
-		miScreenHeight = dm.heightPixels;
-		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-	};
-	
-	/**
-	 * 显示选项视图
-	 */
-	public void showGroud() {
-
-	}
-
-	/**
-	 * 隐藏选项视图
-	 */
-	public void hideGroud() {
-		grid.setVisibility(View.GONE);
-	}
-
-	public interface InputClickListener {
-		void sendImage();
-
-		void sendVideo();
-
-		void sendLocation();
-
-		void sendFile();
-
-		void sendMessage(String message);
-
-	}
-
-	public void setOnInputClickListener(InputClickListener listener) {
-		this.inputClickListener = listener;
-	}
-
-	/**
-	 * 键盘隐藏
-	 */
-	public void hideKeyBode() {
-		InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-		imm.hideSoftInputFromWindow(getApplicationWindowToken(), 0);
-	}
-
+package com.ahao.wifichat.widget
+
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Vibrator
+import android.os.VibrationEffect
+import android.text.Editable
+import android.text.TextWatcher
+import android.util.AttributeSet
+import android.view.MotionEvent
+import android.view.View
+import android.view.inputmethod.InputMethodManager
+import android.widget.Button
+import android.widget.GridView
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.core.content.ContextCompat
+import com.ahao.wifichat.R
+import com.ahao.wifichat.ui.adapter.CommonAdapter
+import com.ahao.wifichat.ui.adapter.ViewHolder
+import com.ahao.wifichat.utlis.AudioRecoder
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+
+/** 聊天输入区：文本输入、按住说话录音、附加功能面板 */
+class ChatInputView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyle: Int = 0,
+) : LinearLayout(context, attrs, defStyle) {
+
+    interface InputClickListener {
+        fun sendImage()
+        fun sendVideo()
+        fun sendLocation()
+        fun sendFile()
+        fun sendMessage(message: String)
+    }
+
+    interface AudioRecordCallback {
+        fun onRecording(iTime: Int, amplitude: Int)
+        fun onStartRecord()
+        fun onReadyCancel()
+        fun onReturnNormal()
+        fun onStopRecord()
+        fun recodEnd(path: String?)
+    }
+
+    private class AdditionItem(val textId: Int, val resId: Int)
+
+    var inputClickListener: InputClickListener? = null
+    var audioCallback: AudioRecordCallback? = null
+
+    /** 附加面板展开时回调（用于滚动消息列表） */
+    var onAdditionExpanded: (() -> Unit)? = null
+
+    /** 没有录音权限时回调，由宿主 Activity 申请 */
+    var onRequestRecordPermission: (() -> Unit)? = null
+
+    private val audioRecorder = AudioRecoder()
+    private val scope = MainScope()
+    private var recordJob: Job? = null
+    private var screenHeight = 0
+    private var needStartRecorder = false
+    private var readyToCancel = false
+    private var downY = 0f
+
+    private val vibrator = context.applicationContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+
+    private val btnAddition: ImageButton
+    private val btnSend: Button
+    private val btnSpeak: Button
+    private val btnSwitch: ImageButton
+    private val input: TextView
+    private val grid: GridView
+
+    private val additionItems = listOf(
+        AdditionItem(R.string.photo, R.drawable.icon_chat_add_photo),
+        AdditionItem(R.string.video, R.drawable.icon_chat_add_video),
+        AdditionItem(R.string.location, R.drawable.icon_chat_add_location),
+        AdditionItem(R.string.File, R.drawable.icon_chat_add_file),
+    )
+
+    init {
+        View.inflate(context, R.layout.p2p_view_chat_input, this)
+
+        btnAddition = findViewById(R.id.btnAddition)
+        btnSend = findViewById(R.id.btnSend)
+        btnSpeak = findViewById(R.id.btnSpeak)
+        btnSwitch = findViewById(R.id.btnSwitch)
+        input = findViewById(R.id.TxtInput)
+        grid = findViewById(R.id.p2p_chat_input_grid)
+
+        btnAddition.setOnClickListener { onAdditionClicked() }
+        btnSend.setOnClickListener {
+            val text = input.text.toString()
+            input.text = ""
+            inputClickListener?.sendMessage(text)
+        }
+        btnSwitch.setOnClickListener { onSwitchClicked() }
+        input.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_DOWN) hideAdditionPanel()
+            false
+        }
+        btnSpeak.setOnTouchListener { _, event -> onSpeakTouch(event) }
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                val hasText = input.text.isNotEmpty()
+                btnAddition.visibility = if (hasText) View.GONE else View.VISIBLE
+                btnSend.visibility = if (hasText) View.VISIBLE else View.GONE
+            }
+        })
+
+        grid.adapter = object : CommonAdapter<AdditionItem>(context, additionItems, R.layout.p2p_view_chat_input_textview) {
+            override fun convert(helper: ViewHolder, item: AdditionItem?) {
+                item ?: return
+                (helper.convertView as? TextView)?.apply {
+                    setCompoundDrawablesWithIntrinsicBounds(null, context.getDrawable(item.resId), null, null)
+                    setText(item.textId)
+                    setOnClickListener {
+                        when (item.resId) {
+                            R.drawable.icon_chat_add_photo -> inputClickListener?.sendImage()
+                            R.drawable.icon_chat_add_video -> inputClickListener?.sendVideo()
+                            R.drawable.icon_chat_add_location -> inputClickListener?.sendLocation()
+                            R.drawable.icon_chat_add_file -> inputClickListener?.sendFile()
+                        }
+                    }
+                }
+            }
+        }
+        hideKeyboard()
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        screenHeight = context.resources.displayMetrics.heightPixels
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    override fun onDetachedFromWindow() {
+        scope.cancel()
+        super.onDetachedFromWindow()
+    }
+
+    fun hideAdditionPanel() {
+        grid.visibility = View.GONE
+    }
+
+    fun hideKeyboard() {
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(applicationWindowToken, 0)
+    }
+
+    private fun onAdditionClicked() {
+        hideKeyboard()
+        if (grid.visibility == View.GONE) {
+            grid.visibility = View.VISIBLE
+            onAdditionExpanded?.invoke()
+        } else {
+            grid.visibility = View.GONE
+        }
+    }
+
+    private fun onSwitchClicked() {
+        hideAdditionPanel()
+        if (btnSpeak.visibility != View.GONE) {
+            btnSwitch.setImageResource(R.drawable.chat_input_voice)
+            btnSpeak.visibility = View.GONE
+        } else {
+            btnSwitch.setImageResource(R.drawable.chat_input_keyboard)
+            btnSpeak.visibility = View.VISIBLE
+            input.text = ""
+            hideKeyboard()
+        }
+    }
+
+    /** 按住说话：按下开始录音，上滑取消，松开发送 */
+    private fun onSpeakTouch(event: MotionEvent): Boolean {
+        when (event.action and MotionEvent.ACTION_MASK) {
+            MotionEvent.ACTION_DOWN -> {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) !=
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    onRequestRecordPermission?.invoke()
+                    return false
+                }
+                downY = event.y
+                needStartRecorder = true
+                readyToCancel = false
+                btnSpeak.setText(R.string.release_end)
+                btnSpeak.setBackgroundResource(R.drawable.details_sendmsg_btn)
+                startRecordingLoop()
+            }
+            MotionEvent.ACTION_UP -> {
+                if (readyToCancel) {
+                    needStartRecorder = false
+                    btnSpeak.setText(R.string.down_speak)
+                    recordJob?.cancel()
+                    audioRecorder.stopRecord()
+                    btnSpeak.setBackgroundResource(R.drawable.input_btn_normal)
+                    audioCallback?.onStopRecord()
+                } else {
+                    needStartRecorder = false
+                    sendVoice()
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val moveDistance = screenHeight / 10
+                if (downY - event.y >= moveDistance) {
+                    if (!readyToCancel) {
+                        vibrate()
+                        btnSpeak.setText(R.string.release_cancel)
+                        audioCallback?.onReadyCancel()
+                    }
+                    readyToCancel = true
+                } else {
+                    if (readyToCancel) {
+                        audioCallback?.onReturnNormal()
+                        btnSpeak.setText(R.string.release_end)
+                    }
+                    readyToCancel = false
+                }
+            }
+        }
+        return false
+    }
+
+    /** 延迟 150ms 后开始录音，期间每 100ms 回调一次进度，满 60 秒自动发送 */
+    private fun startRecordingLoop() {
+        recordJob?.cancel()
+        recordJob = scope.launch {
+            delay(150)
+            while (needStartRecorder) {
+                if (!audioRecorder.isRun) {
+                    vibrate()
+                    audioCallback?.onStartRecord()
+                    audioRecorder.startRecord(context.applicationContext)
+                }
+                val elapsedSeconds = ((System.currentTimeMillis() - audioRecorder.startTime) / 1000).toInt()
+                audioCallback?.onRecording(elapsedSeconds, audioRecorder.amplitude)
+                if (elapsedSeconds >= 60) {
+                    sendVoice()
+                    btnSpeak.isSelected = false
+                    break
+                }
+                delay(100)
+            }
+        }
+    }
+
+    private fun sendVoice() {
+        vibrate()
+        btnSpeak.setText(R.string.down_speak)
+        btnSpeak.setBackgroundResource(R.drawable.input_btn_normal)
+        recordJob?.cancel()
+        if (!audioRecorder.isRun) return
+
+        audioRecorder.stopRecord()
+        audioCallback?.onStopRecord()
+        if (audioRecorder.duration > 0) {
+            audioCallback?.recodEnd(audioRecorder.recordPath)
+        } else {
+            Toast.makeText(context, "录制时间太短", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun vibrate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(30)
+        }
+    }
 }

@@ -1,24 +1,11 @@
-package com.ahao.wifichat.service;
+package com.ahao.wifichat.service
 
-
-import com.ahao.wifichat.protocol.codec.Pack;
+import com.ahao.wifichat.protocol.codec.Pack
 
 /**
- * 负责处理接收到的数据
+ * 处理接收到的数据包。
+ * 所有监听器由同一线程调用，实现方不应长时间阻塞。
  */
-public interface PacketListener {
-
-	/**
-	 * Process the next packet sent to this packet listener.
-	 * <p>
-	 * 
-	 * A single thread is responsible for invoking all listeners, so it's very
-	 * important that implementations of this method not block for any extended
-	 * period of time.
-	 * 
-	 * @param packet
-	 *            the packet to process.
-	 */
-	public void processPacket(Pack packet);
-
+fun interface PacketListener {
+    fun processPacket(packet: Pack)
 }

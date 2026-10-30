@@ -58,25 +58,3 @@ TCP服务端口	12425
 |size	|bigint		|文件大小，单位：byte|
 |uri	|varchar(1024)	|	文件本地存储路径。对于文件发送方，该字段为发送文件所存储在本地的路径；对于文件接收方，该字段为接收文件所保存在本地的路径。|
 |status	|tinyint|		文件下载状态，对于当前用户接收文件有效 0：下载未完成  1：下载完成|
-
-<h1>技术栈</h1>
-
-- 语言：Kotlin（已由 Java 全量迁移）
-- 数据库：[Room](https://developer.android.com/training/data-storage/room)（首次启动自动从旧 LitePal 库 `WiFIChat.db` 迁移数据）
-- 异步：Kotlin Coroutines / Flow（替代 RxJava / RxAndroid）
-- 权限：`ActivityResultContracts.RequestMultiplePermissions`（替代 RxPermissions）
-- 目标系统：compileSdk / targetSdk 37（Android 17），minSdk 23
-
-<h1>引用到的第三方库</h1>
-
-[gson](https://github.com/google/gson/)
-
-[room](https://developer.android.com/jetpack/androidx/releases/room)
-
-[kotlinx-coroutines](https://github.com/Kotlin/kotlinx.coroutines)
-
-[logger](https://github.com/orhanobut/logger/)
-
-[photoview](https://github.com/chrisbanes/PhotoView/)
-
-[matisse](https://github.com/zhihu/Matisse/)
